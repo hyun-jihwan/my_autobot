@@ -1,0 +1,18 @@
+{
+  "scan_interval": 300,
+  "fast_scan_interval": 60,
+  "watchlist": [],
+  "strategy3_signals": [],
+  "exchange": "upbit",
+  "api_key": "YOUR_UPBIT_API_KEY",
+  "secret_key": "YOUR_UPBIT_SECRET_KEY",
+  "run_mode": "real",
+  "max_position": 2,
+  "strategies": ["strategy1", "strategy2", "strategy3"],
+  "tele_token": "7654798631:AAHk6wKVgdLA6IpDcFkvhfQ-wANlFaMtjM4",
+  "tele_chat_id": "7576247687",
+  "operating_capital": 10000,
+  "sheet_enabled": false,
+  "sheet_id": "",
+  "sheet_tab": ""
+}
