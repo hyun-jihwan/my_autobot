@@ -18,6 +18,7 @@ def sell_strategy2(candles_dict, balance):
         holding = get_holding_data(symbol)
         entry_price = holding["entry_price"]
         quantity = holding["quantity"]
+        prev_cci = holding.get("prev_cci")
         max_price = holding.get("max_price", entry_price)
         current_price = candles[-1]["trade_price"]
 
@@ -56,8 +57,7 @@ def sell_strategy2(candles_dict, balance):
 
             # 조건 3: CCI 급락
             cci = indicators.get("cci")
-            prev_cci = holding.get("prev_cci")
-            if prev_cci is not None and prev_cci > 100 and cci < 80:
+            if prev_cci is not None and prev_cci > 100 and cci is not None and cci < 80:
                 condition_count += 1
             holding["prev_cci"] = cci  # 상태 업데이트 필요
 

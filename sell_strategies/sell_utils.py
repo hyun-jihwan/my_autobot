@@ -45,10 +45,11 @@ def get_indicators(candles):
         recent_tps = typical_prices[-period:]
         ma = sum(recent_tps) / period
         mean_dev = sum([abs(tp - ma) for tp in recent_tps]) / period
-        if mean_dev != 0:
-            cci = (recent_tps[-1] - ma) / (0.015 * mean_dev)
-        else:
+
+        if mean_dev == 0:
             cci = 0
+        else:
+            cci = (recent_tps[-1] - ma) / (0.015 * mean_dev)
 
 
     # ✅ 볼린저밴드 계산 (상단만 사용)

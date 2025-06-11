@@ -32,9 +32,11 @@ def get_krw_balance():
 def update_balance_after_buy(amount):
     balance["KRW"] -= amount
 
-def update_balance_after_sell(amount):
-    balance["KRW"] += amount
+def update_balance_after_sell(symbol, sell_price, quantity):
+    proceeds = sell_price*quantity
+    balance["total_balance"] += proceeds
 
+    proceeds *= 0.999
 
 def get_holdings():
     return balance["holdings"]
@@ -86,7 +88,7 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
         holding["source"] = source
 
 
-    balance["holdings"].append(holding)
+    balance["holdings"][symbol] = holding_data
 
     # 💾 보유 종목 저장
     save_holdings_to_file()
