@@ -12,6 +12,7 @@ from scanners.scanner2 import detect_strategy2_signals
 from transition.strategy3_exit import handle_strategy3_exit
 from scanners.scanner3 import detect_fast_rising_symbols
 from utils.balance import balance
+from strategy.sell_strategy2 import sell_strategy2
 
 
 # 봇 실행 전 → 보유 종목 자동 복구
@@ -57,6 +58,21 @@ def run():
                         print(f"✅ {strategy_name} 실행 결과: {result}")
                 except Exception as e:
                     print(f"❌ {strategy_name} 실행 중 오류: {e}")
+
+        # 전략2 매도 전략 실행
+        try:
+            candles_dict = {}
+            for symbol in list(balance["holdings"].keys()):
+                candles = get_candles(symbol, interval="1", count=50)
+                if candles:
+                    candles_dict[symbol] = candles
+
+            sell_results = sell_strategy2(candles_dict, balance)
+
+            for res in sell_results:
+                print(f"💸 전략2 매도 완료: {res['symbol']} / 가격: {res['price']} / 유형: {res['type']}")
+        except Exception as e:
+            print(f"❌ 전략2 매도 실행 중 오류: {e}")
 
         # 전략3 급등 감지 (fast mode 트리거용)
         strategy3_signals = detect_fast_rising_symbols()
