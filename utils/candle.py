@@ -1,15 +1,36 @@
 import requests
 
 def get_candles(symbol, interval="15", count=30):
-    """업비트에서 15분봉 캔들 데이터 조회"""
-    url = f"https://api.upbit.com/v1/candles/minutes/{interval}"
+    """
+    업비트 캔들 데이터 조회
+    interval:
+      - "1", "3", "5", "15", "30", "60", "240" → 분봉
+      - "day" → 일봉
+      - "week" → 주봉
+      - "month" → 월봉
+    """
+    if interval == "day":
+        url = "https://api.upbit.com/v1/candles/days"
+    elif interval == "week":
+        url = "https://api.upbit.com/v1/candles/weeks"
+    elif interval == "month":
+        url = "https://api.upbit.com/v1/candles/months"
+    else:
+        url = f"https://api.upbit.com/v1/candles/minutes/{interval}"
+
     params = {"market": symbol, "count": count}
     headers = {"accept": "application/json"}
 
-    response = requests.get(url, params=params, headers=headers)
-    if response.status_code == 200:
-        return response.json()
-    return []
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ {symbol} → 요청 중 예외 발생: {e}")
+        return []
 
 def is_box_breakout(candles):
     """
@@ -97,13 +118,16 @@ def is_v_rebound(candles):
     return False
 
 def get_all_krw_symbols():
-    """
-    업비트 KRW 마켓 전체 종목 리스트 불러오기
-    예: ['KRW-BTC', 'KRW-ETH', 'KRW-XRP', ...]
-    """
     url = "https://api.upbit.com/v1/market/all"
-    response = requests.get(url)
-    data = response.json()
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return [item['market'] for item in data if item['market'].startswith("KRW-")]
+        else:
+            print("❌ 심볼 목록 가져오기 실패")
+            return []
+    except Exception as e:
+        print(f"❌ 심볼 요청 중 오류: {e}")
+        return []
 
-    krw_symbols = [item['market'] for item in data if item['market'].startswith("KRW-")]
-    return krw_symbols

@@ -11,6 +11,7 @@ from utils.candle import get_all_krw_symbols, get_candles
 from scanners.scanner2 import detect_strategy2_signals
 from transition.strategy3_exit import handle_strategy3_exit
 from scanners.scanner3 import detect_fast_rising_symbols
+from utils.balance import balance
 
 
 # 봇 실행 전 → 보유 종목 자동 복구
@@ -19,6 +20,10 @@ load_holdings_from_file()
 # 설정 불러오기
 with open("config.json") as f:
     config = json.load(f)
+
+balance["holdings"].clear()
+print("✅ 보유 종목 초기화 완료")
+
 
 # 전략 매핑
 strategy_map = {

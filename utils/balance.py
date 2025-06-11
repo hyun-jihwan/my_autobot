@@ -56,7 +56,7 @@ def save_holdings_to_file(filepath="data/holdings.json"):
         json.dump(balance["holdings"], f, indent=2, ensure_ascii=False)
 
 # ✅ record_holding 함수 내부에서 아래처럼 저장되도록 수정
-def record_holding(symbol, entry_price, quantity, score=None, expected_profit=None, source=None, entry_time=None):
+def record_holding(symbol, entry_price, quantity, score=None, expected_profit=None, source=None, entry_time=None, target_2=0, target_3=0, extra=None):
     balance["holdings"] = [h for h in balance["holdings"] if h["symbol"] != symbol]
     print(f"🗑 보유 목록에서 제거됨 → {symbol}")
 
@@ -67,8 +67,17 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
         "symbol": symbol,
         "entry_price": entry_price,
         "quantity": quantity,
-        "entry_time": entry_time
+        "max_price": entry_price,   # 최고가 초기값
+        "prev_cci": None,            # 이전 CCI 초기화
+        "score": score,
+        "expected_profit": expected_profit,
+        "target_2": target_2,
+        "target_3": target_3,
+        "entry_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+
+    if extra:
+        holding_data.update(extra)
     if score is not None:
         holding["score"] = score
     if expected_profit is not None:

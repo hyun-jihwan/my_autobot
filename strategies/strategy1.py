@@ -13,7 +13,10 @@ from utils.risk import calculate_swing_target_with_fibonacci, calculate_scalping
 from utils.risk import judge_trade_type
 from utils.filter import get_top_rising_symbols
 from utils.trade import sell_market_order
+from utils.trade import calculate_targets
 from transition.strategy3_exit import handle_strategy3_exit
+from sell_strategies.sell_strategy1 import check_sell_signal_strategy1, evaluate_swing_exit
+from sell_strategies.sell_utils import get_indicators
 
 
 def run_strategy1(config):
@@ -142,6 +145,38 @@ def run_strategy1(config):
     print(f"[스캔대상] 현재 감시 종목 수: {len(watchlist)}개")
     print(f"[📊 오늘 상승률 상위 종목] {watchlist}")
 
+    # ✅ 전략 1 보유 종목 매도 조건 검사 (5분마다 실행)
+    if "last_sell_check" not in config:
+        config["last_sell_check"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+    last_check = datetime.strptime(config["last_sell_check"], "%Y-%m-%d %H:%M")
+    if (datetime.now() - last_check).seconds >= 300:  # 5분마다 검사
+        config["last_sell_check"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+        holdings = get_holdings()
+        for h in holdings:
+            if h.get("source") != "strategy1":
+                continue
+
+            symbol = h["symbol"]
+            quantity = h["quantity"]
+            candles = get_candles(symbol, interval="5", count=30)
+            if not candles or len(candles) < 5:
+                continue
+
+            indicators = get_indicators(candles)
+            signal = check_sell_signal_strategy1(h, candles, indicators)
+
+            if signal:
+                print(f"🚨 [전략1 매도] 조건 충족 → {symbol} / 사유: {signal}")
+                price = candles[0]["trade_price"]
+
+                sell_market_order(symbol)
+                update_balance_after_sell(price * quantity)
+
+                # 보유 종목 제거
+                holdings.remove(h)
+
 
     # ✅ [3] 전략 실행용 리스트
     selected = []
@@ -173,6 +208,14 @@ def run_strategy1(config):
 
         entry_price = candles[0]["trade_price"]
         is_swing = judge_trade_type(candles)
+
+        # ✅ 목표가 계산 (스윙일 때만)
+        target_2, target_3 = 0, 0
+        if is_swing:
+            target_2, target_3 = calculate_targets(symbol)
+            if target_2 is None or target_3 is None:
+                print(f"⚠️ {symbol} → 목표가 계산 실패 → 스킵")
+                continue  # 목표가 계산 실패 시 스킵
 
         if is_swing:
             candles_1h = get_candles(symbol, interval="60", count=30)

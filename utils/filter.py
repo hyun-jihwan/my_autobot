@@ -1,10 +1,13 @@
 from utils.candle import get_all_krw_symbols, get_candles
+import time
 
-def get_top_rising_symbols(limit=35, min_volume=100000000):
+def get_top_rising_symbols(limit=35, min_volume=1000000000):
     candidates = []
 
     for symbol in get_all_krw_symbols():
+        time.sleep(0.1)  # 0.1초 딜레이
         candles = get_candles(symbol, interval="day", count=2)
+
         if not candles or len(candles) < 2:
             continue
 
