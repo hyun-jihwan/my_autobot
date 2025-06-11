@@ -12,13 +12,23 @@ try:
             if not content:
                 raise ValueError("파일 내용 없음")
             balance = json.loads(content)
+
+            # ✅ 구조 보정
+            if "holdings" not in balance or not isinstance(balance["holdings"], dict):
+                balance["holdings"] = {}
+            if "KRW" not in balance:
+                balance["KRW"] = 1000000
+            if "switched" not in balance:
+                balance["switched"] = False
+
+
     else:
         raise FileNotFoundError("holdings.json 없음")
 except Exception as e:
     print(f"❌ holdings.json 로드 실패: {e}")
     balance = {
         "KRW": 1000000,
-        "holdings": [],
+        "holdings": {},
         "switched": False  # ✅ 갈아타기 여부
     }
 
@@ -55,7 +65,10 @@ def get_holding_info():
 def save_holdings_to_file(filepath="data/holdings.json"):
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
     with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(balance["holdings"], f, indent=2, ensure_ascii=False)
+        json.dump({
+            "holdings": balance["holdings"],     # ✅ dict 그대로 저장
+            "KRW": balance["total_balance"]
+        }, f, indent=2, ensure_ascii=False)
 
 # ✅ record_holding 함수 내부에서 아래처럼 저장되도록 수정
 def record_holding(symbol, entry_price, quantity, score=None, expected_profit=None, source=None, entry_time=None, target_2=0, target_3=0, extra=None):
@@ -75,7 +88,7 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
         "expected_profit": expected_profit,
         "target_2": target_2,
         "target_3": target_3,
-        "entry_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "entry_time": entry_time
     }
 
     if extra:
@@ -88,7 +101,7 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
         holding["source"] = source
 
 
-    balance["holdings"][symbol] = holding_data
+    balance["holdings"][symbol] = holding
 
     # 💾 보유 종목 저장
     save_holdings_to_file()
@@ -97,13 +110,13 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
 
 # 🔁 재시작 시 복구용 로드 함수
 def load_holdings_from_file(filepath="data/holdings.json"):
-    if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as f:
-            try:
-                balance["holdings"] = json.load(f)
-                print("🔄 holdings.json → 보유 종목 복구 완료")
-            except Exception as e:
-                print(f"❌ holdings.json 로드 실패: {e}")
+    if not os.path.exists(filepath):
+        return
+    with open(filepath, "r", encoding="utf-8") as f:
+        data = json.load(f)
+        balance["holdings"] = data.get("holdings", {})  # ✅ 리스트(X) → 딕셔너리(O)
+        balance["total_balance"] = data.get("KRW", 0)
+        print("🔄 holdings.json → 보유 종목 복구 완료")
 
 def reset_switch_flag():
     balance["switched"] = False

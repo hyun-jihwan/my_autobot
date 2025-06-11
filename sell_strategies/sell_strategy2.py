@@ -1,5 +1,5 @@
-from utils.sell_utils import get_indicators
-from utils.order_utils import update_balance_after_sell, clear_holdings
+from sell_strategies.sell_utils import get_indicators
+from utils.balance import update_balance_after_sell, clear_holdings
 from utils.log_utils import log_sell
 from db.holdings import get_holding_symbols, get_holding_data
 

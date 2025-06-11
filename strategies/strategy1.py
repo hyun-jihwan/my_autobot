@@ -1,3 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+
 from datetime import datetime
 from utils.candle import get_candles, is_box_breakout, is_breakout_pullback, is_v_rebound
 from utils.indicators import calculate_indicators
@@ -183,7 +188,23 @@ def run_strategy1(config):
 
     # ✅ [4] 스캔 루프
     for symbol in get_all_krw_symbols():  # 전체 KRW 종목 기준으로 루프
-        candles = get_candles(symbol, interval="15", count=30)
+        candles = get_candles(symbol, interval="1", count=16)
+
+        # 캔들 강제 수정 (전략1 테스트용)
+        if len(candles) >= 16:
+            for i in range(15):
+                candles[i]["high_price"] = 100
+                candles[i]["trade_price"] = 95
+                candles[i]["candle_acc_trade_volume"] = 10000
+
+            candles[-1] = {
+                "trade_price": 110,
+                "opening_price": 90,
+                "high_price": 111,
+                "low_price": 89,
+                "candle_acc_trade_volume": 20000  # 이전보다 2배
+            }
+
         if not candles or len(candles) < 12:
             continue
 
@@ -203,6 +224,7 @@ def run_strategy1(config):
                 print(f"🚨 예외 급등 진입 허용: {symbol}")
             else:
                 continue  # watchlist에도 없고 급등 조건도 없음 → 진입 차단
+
 
         # ✅ 여기 아래에 이 코드 추가!
 
@@ -369,7 +391,22 @@ def run_strategy1(config):
         update_balance_after_buy(position)
 
         # 💡 먼저 보유 기록 등록 (이제 quantity 정의됨)
-        record_holding(symbol, entry_price, quantity, score, expected_profit)
+        record_holding(
+            symbol=symbol,
+            entry_price=entry_price,
+            quantity=quantity,
+            score=score,
+            expected_profit=expected,
+            target_2=target2,
+            target_3=target3,
+            extra={
+                "max_price":entry_price,
+                "prev_cci": indicators.get("cci", None),  # 혹은 None
+            entry_time : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+        )
+
+        print(f"✅ 전략1 진입 성공! {symbol}, 진입가: {entry_price}, 수량: {quantity}")
 
         # 예측 수익률 통과 후
         # 보조지표 값에서 RSI, OBV, MACD 추출
@@ -415,3 +452,20 @@ def run_strategy1(config):
             return selected[0]
 
         return None
+
+if __name__ == "__main__":
+    import datetime
+    from utils.balance import record_holding
+
+    print("📥 테스트 진입 시작")
+
+    record_holding(
+        symbol="KRW-TEST",
+        entry_price=100.0,
+        quantity=5,
+        score=80,
+        expected_profit=0.3,
+        entry_time=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
+
+    print("✅ 테스트 진입 완료 — holdings.json 저장을 확인해보세요")
