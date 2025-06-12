@@ -5,6 +5,26 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 
 from sell_strategies.sell_utils import get_indicators
+from utils.balance import balance, save_holdings_to_file, remove_holding
+
+
+def sell_strategy1(config):
+    print("📤 매도 전략 1 실행됨")
+    from utils.balance import balance, save_holdings_to_file
+
+    to_delete = []
+
+    for symbol, data in balance["holdings"].items():
+        print(f"📤 매도 체크: {symbol}")
+        # 여기에 간단히 조건: 무조건 매도
+        print(f"✅ 매도 완료: {symbol}")
+        to_delete.append(symbol)
+
+    for symbol in to_delete:
+        remove_holding(symbol)
+
+    save_holdings_to_file()
+
 
 
 def check_sell_signal_strategy1(holding, candles, indicators):
@@ -198,9 +218,8 @@ def evaluate_swing_exit(symbol, entry_price, target_1, target_2, target_3):
     return result
 
 if __name__ == "__main__":
-    from utils.balance import balance, save_holdings_to_file
-
     print("📤 매도 전략 1 테스트 시작")
+    from utils.balance import balance
     print("보유 종목:", list(balance["holdings"].keys()))
 
     # 가짜 config 넣어도 무방

@@ -21,6 +21,7 @@ from utils.trade import sell_market_order
 from utils.trade import calculate_targets
 from transition.strategy3_exit import handle_strategy3_exit
 from sell_strategies.sell_strategy1 import check_sell_signal_strategy1, evaluate_swing_exit
+from sell_strategies.sell_strategy1 import sell_strategy1
 from sell_strategies.sell_utils import get_indicators
 
 
@@ -402,56 +403,60 @@ def run_strategy1(config):
             extra={
                 "max_price":entry_price,
                 "prev_cci": indicators.get("cci", None),  # 혹은 None
-            entry_time : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            'entry_time' : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
         )
 
         print(f"✅ 전략1 진입 성공! {symbol}, 진입가: {entry_price}, 수량: {quantity}")
 
-        # 예측 수익률 통과 후
-        # 보조지표 값에서 RSI, OBV, MACD 추출
-        rsi_value = indicator_result.get("RSI_VALUE", 65)
-        macd_hist = indicator_result.get("MACD_HIST", 0)
-        obv_slope = indicator_result.get("OBV_SLOPE", True)
+    print("📤 진입 루프 종료 → 매도 전략 실행")
+    sell_strategy1(config)
 
-        # 단타/스윙 자동 분류
-        mode = classify_trade_mode(candles[0], rsi_value, obv_slope, macd_hist)
-        print(f"[전개방식] {symbol} → 판단 결과: {mode}")
+    # 예측 수익률 통과 후
+    # 보조지표 값에서 RSI, OBV, MACD 추출
+    rsi_value = indicator_result.get("RSI_VALUE", 65)
+    macd_hist = indicator_result.get("MACD_HIST", 0)
+    obv_slope = indicator_result.get("OBV_SLOPE", True)
 
-        # 목표 수익률 계산
-        if mode == "단타":
-            target_profit = max(2.0, expected_profit)
-        elif mode == "스윙":
-            target_profit = expected_profit + 9.0  # 또는 +5.0 정도 더해도 OK
-        else:
-            target_profit = expected_profit
+    # 단타/스윙 자동 분류
+    mode = classify_trade_mode(candles[0], rsi_value, obv_slope, macd_hist)
+    print(f"[전개방식] {symbol} → 판단 결과: {mode}")
 
-        if balance < position:
-            print(f"❌ 잔고 부족: {symbol} → 보유 KRW {balance}, 필요 {position}")
+    # 목표 수익률 계산
+    if mode == "단타":
+        target_profit = max(2.0, expected_profit)
+    elif mode == "스윙":
+        target_profit = expected_profit + 9.0  # 또는 +5.0 정도 더해도 OK
+    else:
+        target_profit = expected_profit
+
+    if balance < position:
+        print(f"❌ 잔고 부족: {symbol} → 보유 KRW {balance}, 필요 {position}")
             continue
 
-        update_balance_after_buy(position)
+    update_balance_after_buy(position)
 
-        result = {
-            "종목": symbol,
-            "전략": "strategy1",
-            "진입가": candles[0]["trade_price"],
-            "예상수익률": expected_profit,
-            "예상손익비": rr,
-            "스코어": score,
-            "진입비중": position_ratio,
-            "진입금액": position,        # 원 단위
-            "전개방식": mode,
-            "최고가": candles[0]["trade_price"],  # 진입가로 초기화
-            "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+    result = {
+        "종목": symbol,
+        "전략": "strategy1",
+        "진입가": candles[0]["trade_price"],
+        "예상수익률": expected_profit,
+        "예상손익비": rr,
+        "스코어": score,
+        "진입비중": position_ratio,
+        "진입금액": position,        # 원 단위
+        "전개방식": mode,
+        "최고가": candles[0]["trade_price"],  # 진입가로 초기화
+        "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
 
-        selected.append(result)
+    selected.append(result)
 
-        if selected:
-            return selected[0]
+    if selected:
+        return selected[0]
 
-        return None
+
+    return None
 
 if __name__ == "__main__":
     import datetime
