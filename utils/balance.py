@@ -5,32 +5,40 @@ from utils.candle import get_candles
 
 
 # ✅ 잔고 로드 (holdings.json)
+import os
+import json
+
+# ✅ 잔고 로드 (data/holdings.json)
 try:
-    if os.path.exists("holdings.json"):
-        with open("holdings.json", "r") as f:
-            content = f.read().strip()
-            if not content:
-                raise ValueError("파일 내용 없음")
-            balance = json.loads(content)
+    filepath = "data/holdings.json"
 
-            # ✅ 구조 보정
-            if "holdings" not in balance or not isinstance(balance["holdings"], dict):
-                balance["holdings"] = {}
-            if "KRW" not in balance:
-                balance["KRW"] = 1000000
-            if "switched" not in balance:
-                balance["switched"] = False
-
-
-    else:
+    if not os.path.exists(filepath):
         raise FileNotFoundError("holdings.json 없음")
+
+    with open(filepath, "r", encoding="utf-8") as f:
+        content = f.read().strip()
+        if not content:
+            raise ValueError("파일 내용 없음")
+
+        balance = json.loads(content)
+
+        # ✅ 구조 보정
+        if "holdings" not in balance or not isinstance(balance["holdings"], dict):
+            balance["holdings"] = {}
+        if "KRW" not in balance:
+            balance["KRW"] = 1000000
+        if "switched" not in balance:
+            balance["switched"] = False
+
 except Exception as e:
     print(f"❌ holdings.json 로드 실패: {e}")
     balance = {
         "KRW": 1000000,
-        "holdings": {},
-        "switched": False  # ✅ 갈아타기 여부
+        "holdings": {},          # ✅ 반드시 dict
+        "switched": False
     }
+
+
 
 def clear_holdings():
     global holdings
@@ -67,12 +75,14 @@ def save_holdings_to_file(filepath="data/holdings.json"):
     with open(filepath, "w", encoding="utf-8") as f:
         json.dump({
             "holdings": balance["holdings"],     # ✅ dict 그대로 저장
-            "KRW": balance["total_balance"]
+            "KRW": balance["KRW"],
+            "switched": balance.get("switched", False)
         }, f, indent=2, ensure_ascii=False)
 
 # ✅ record_holding 함수 내부에서 아래처럼 저장되도록 수정
 def record_holding(symbol, entry_price, quantity, score=None, expected_profit=None, source=None, entry_time=None, target_2=0, target_3=0, extra=None):
-    balance["holdings"] = [h for h in balance["holdings"] if h["symbol"] != symbol]
+    if symbol in balance["holdings"]:
+        del balance["holdings"][symbol]
     print(f"🗑 보유 목록에서 제거됨 → {symbol}")
 
     if entry_time is None:
@@ -92,7 +102,7 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
     }
 
     if extra:
-        holding_data.update(extra)
+        holding.update(extra)
     if score is not None:
         holding["score"] = score
     if expected_profit is not None:
@@ -113,10 +123,20 @@ def load_holdings_from_file(filepath="data/holdings.json"):
     if not os.path.exists(filepath):
         return
     with open(filepath, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        balance["holdings"] = data.get("holdings", {})  # ✅ 리스트(X) → 딕셔너리(O)
-        balance["total_balance"] = data.get("KRW", 0)
-        print("🔄 holdings.json → 보유 종목 복구 완료")
+        try:
+            data = json.load(f)
+            if not isinstance(data, dict):
+                raise ValueError("❌ holdings.json → 딕셔너리 아님")
+
+            balance["holdings"] = data.get("holdings", {})  # ✅ 리스트(X) → 딕셔너리(O)
+            balance["KRW"] = data.get("KRW", 1000000),
+            balance["switched"] = data.get("switched", False)
+
+
+            print("🔄 holdings.json → 보유 종목 복구 완료")
+        except Exception as e:
+            print(f"❌ holdings.json 로드 실패: {e}")
+
 
 def reset_switch_flag():
     balance["switched"] = False

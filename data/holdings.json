@@ -1,0 +1,18 @@
+{
+  "holdings": {
+    "KRW-TEST": {
+      "symbol": "KRW-TEST",
+      "entry_price": 100.0,
+      "quantity": 5,
+      "max_price": 100.0,
+      "prev_cci": null,
+      "score": 80,
+      "expected_profit": 0.3,
+      "target_2": 0,
+      "target_3": 0,
+      "entry_time": "2025-06-12 04:29:31"
+    }
+  },
+  "KRW": 1000000,
+  "switched": false
+}

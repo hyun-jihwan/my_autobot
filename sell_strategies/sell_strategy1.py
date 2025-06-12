@@ -1,4 +1,9 @@
 # 전략 1 단타 매도 조건 - 완성 버전
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+
+
 from sell_strategies.sell_utils import get_indicators
 
 
@@ -191,3 +196,15 @@ def evaluate_swing_exit(symbol, entry_price, target_1, target_2, target_3):
         return result
 
     return result
+
+if __name__ == "__main__":
+    from utils.balance import balance, save_holdings_to_file
+
+    print("📤 매도 전략 1 테스트 시작")
+    print("보유 종목:", list(balance["holdings"].keys()))
+
+    # 가짜 config 넣어도 무방
+    sell_strategy1(config={})
+
+    print("📤 매도 전략 1 테스트 완료")
+    print("잔여 종목:", list(balance["holdings"].keys()))
