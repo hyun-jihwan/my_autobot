@@ -6,25 +6,47 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 from sell_strategies.sell_utils import get_indicators
 from utils.balance import balance, save_holdings_to_file, remove_holding
+from utils.candle import get_candles
 
 
 def sell_strategy1(config):
     print("📤 매도 전략 1 실행됨")
-    from utils.balance import balance, save_holdings_to_file
+
+    holdings = balance["holdings"]
+    if not holdings:
+        print("⚠️ 현재 보유 중인 종목이 없습니다.")
+        return
 
     to_delete = []
 
-    for symbol, data in balance["holdings"].items():
+    for symbol, data in holdings.items():
         print(f"📤 매도 체크: {symbol}")
         # 여기에 간단히 조건: 무조건 매도
-        print(f"✅ 매도 완료: {symbol}")
-        to_delete.append(symbol)
+        entry_price = data["entry_price"]
+        quantity = data["quantity"]
+
+        # ✅ 캔들과 보조지표 불러오기
+        candles = get_candles(symbol, interval="1", count=10)
+        if not candles or len(candles) < 5:
+            print(f"⚠️ 캔들 부족: {symbol}")
+            continue
+
+        indicators = get_indicators(candles)
+
+        # ✅ 매도 조건 판단
+        signal = check_sell_signal_strategy1(data, candles, indicators)
+
+        if signal:
+            print(f"✅ 매도 조건 충족: {symbol} / 이유: {signal}")
+            to_delete.append(symbol)
+        else:
+            print(f"⏳ 매도 조건 미충족: {symbol}")
 
     for symbol in to_delete:
         remove_holding(symbol)
 
     save_holdings_to_file()
-
+    print("📤 매도 전략 1 완료 — holdings.json 저장됨")
 
 
 def check_sell_signal_strategy1(holding, candles, indicators):

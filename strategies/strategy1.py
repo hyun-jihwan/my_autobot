@@ -1,28 +1,28 @@
 import sys
 import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-
-from datetime import datetime
-from utils.candle import get_candles, is_box_breakout, is_breakout_pullback, is_v_rebound
-from utils.indicators import calculate_indicators
-from utils.risk import calculate_expected_risk
-from utils.score import calculate_score_full
-from utils.candle import get_all_krw_symbols, get_candles
-from utils.signal import classify_trade_mode
-from utils.position import assign_position_size
-from utils.balance import get_krw_balance, update_balance_after_buy, record_holding
-from utils.balance import get_holding_symbols, get_holding_count, get_holding_info
-from utils.balance import get_holdings, update_balance_after_sell
-from utils.risk import calculate_swing_target_with_fibonacci, calculate_scalping_target
-from utils.risk import judge_trade_type
-from utils.filter import get_top_rising_symbols
-from utils.trade import sell_market_order
-from utils.trade import calculate_targets
-from transition.strategy3_exit import handle_strategy3_exit
-from sell_strategies.sell_strategy1 import check_sell_signal_strategy1, evaluate_swing_exit
-from sell_strategies.sell_strategy1 import sell_strategy1
 from sell_strategies.sell_utils import get_indicators
+from sell_strategies.sell_strategy1 import sell_strategy1
+from sell_strategies.sell_strategy1 import check_sell_signal_strategy1, evaluate_swing_exit
+from transition.strategy3_exit import handle_strategy3_exit
+from utils.trade import calculate_targets
+from utils.trade import sell_market_order
+from utils.filter import get_top_rising_symbols
+from utils.risk import judge_trade_type
+from utils.risk import calculate_swing_target_with_fibonacci, calculate_scalping_target
+from utils.balance import get_holdings, update_balance_after_sell
+from utils.balance import get_holding_symbols, get_holding_count, get_holding_info
+from utils.balance import get_krw_balance, update_balance_after_buy, record_holding
+from utils.position import assign_position_size
+from utils.signal import classify_trade_mode
+from utils.candle import get_all_krw_symbols, get_candles
+from utils.score import calculate_score_full
+from utils.risk import calculate_expected_risk
+from utils.indicators import calculate_indicators
+from utils.candle import get_candles, is_box_breakout, is_breakout_pullback, is_v_rebound
+from datetime import datetime
 
 
 def run_strategy1(config):
@@ -76,6 +76,7 @@ def run_strategy1(config):
                 print(f"⚠️ score/expected_profit 기록 없음 → {symbol} 차단 유지")
                 continue
 
+
 def handle_strategy2_positions():
     now = datetime.now()
     if now.strftime("%H:%M") < "09:15":
@@ -103,7 +104,6 @@ def handle_strategy2_positions():
             is_swing = judge_trade_type(hourly_candles)
             current_price = candles[0]["trade_price"]
 
-
             # ✅ 간단한 판단 로직 (보완된 조건)
             body = abs(candles[0]["opening_price"] - candles[0]["trade_price"])
             high = candles[0]["high_price"]
@@ -123,6 +123,7 @@ def handle_strategy2_positions():
                 print(f"✅ {symbol} → 단타 조건 충족 → 유지")
 
     return blocked_symbols
+
 
 def run_strategy1(config):
     # 리스트 갱신을 위한 전역 변수
@@ -183,7 +184,6 @@ def run_strategy1(config):
                 # 보유 종목 제거
                 holdings.remove(h)
 
-
     # ✅ [3] 전략 실행용 리스트
     selected = []
 
@@ -209,7 +209,6 @@ def run_strategy1(config):
         if not candles or len(candles) < 12:
             continue
 
-
         # 리스트에 없는 종목인데 급등 감지된 경우 예외 진입 허용
         in_list = symbol in watchlist
 
@@ -219,13 +218,13 @@ def run_strategy1(config):
             price_change = (price_now - price_prev) / price_prev * 100
 
             volume_now = candles[0]["candle_acc_trade_volume"]
-            volume_avg = sum([c["candle_acc_trade_volume"] for c in candles[1:4]]) / 3
+            volume_avg = sum([c["candle_acc_trade_volume"]
+                             for c in candles[1:4]]) / 3
 
             if price_change >= 1.2 and volume_now >= volume_avg * 1.5:
                 print(f"🚨 예외 급등 진입 허용: {symbol}")
             else:
                 continue  # watchlist에도 없고 급등 조건도 없음 → 진입 차단
-
 
         # ✅ 여기 아래에 이 코드 추가!
 
@@ -242,20 +241,25 @@ def run_strategy1(config):
 
         if is_swing:
             candles_1h = get_candles(symbol, interval="60", count=30)
-            expected_profit, expected_loss, rr, fib_0618, fib_1000, fib_1618, market_mode = calculate_swing_target_with_fibonacci(candles_1h)
+            expected_profit, expected_loss, rr, fib_0618, fib_1000, fib_1618, market_mode = calculate_swing_target_with_fibonacci(
+                candles_1h)
 
             # 시장 상황에 따라 목표가 설정
             expected_target = fib_0618 if market_mode == "보수장" else (
                 fib_1000 if market_mode == "중립장" else fib_1618
             )
-            expected_profit = ((expected_target - entry_price) / entry_price) * 100
+            expected_profit = (
+    (expected_target - entry_price) / entry_price) * 100
 
             print(f"[전략 분기] → 스윙 / 시장상태: {market_mode}")
-            print(f"[목표가 설정] → {expected_target:.2f}원 / 수익률: {expected_profit:.2f}% / RR: {rr:.2f}")
+            print(
+                f"[목표가 설정] → {expected_target:.2f}원 / 수익률: {expected_profit:.2f}% / RR: {rr:.2f}")
 
         else:
-            expected_profit, expected_loss, rr = calculate_scalping_target(candles)
-            print(f"[전략 분기] → 단타 / 예상 수익률: {expected_profit:.2f}% / RR: {rr:.2f}")
+            expected_profit, expected_loss, rr = calculate_scalping_target(
+                candles)
+            print(
+                f"[전략 분기] → 단타 / 예상 수익률: {expected_profit:.2f}% / RR: {rr:.2f}")
 
         holding_symbols = get_holding_symbols()
         holding_count = get_holding_count()
@@ -306,7 +310,12 @@ def run_strategy1(config):
         }
 
         # ✅ 스코어 계산
-        score = calculate_score_full(candles, pattern_matched, indicator_result, expected_profit, expected_loss)
+        score = calculate_score_full(
+    candles,
+    pattern_matched,
+    indicator_result,
+    expected_profit,
+     expected_loss)
         print(f"[스코어링] {symbol} → 총점: {score}점")
 
         if score < 50:
@@ -331,7 +340,7 @@ def run_strategy1(config):
             position = "100%"
         elif score >= 80:
             position = "1차 70% + 2차 30%"
-        elif score >= 70: #테스트
+        elif score >= 70:  # 테스트
             position = "1차 30% + 2차 70%"
         else:
             print(f"❌조건 미충족: 스코어 70점 미만 - 진입안함")
@@ -350,7 +359,8 @@ def run_strategy1(config):
 
         # ✅ 보유 종목이 있을 경우, 형식 검사 및 필터링
         holdings = get_holding_info()
-        holdings = [h for h in holdings if isinstance(h, dict) and "score" in h and "expected_profit" in h]
+        holdings = [h for h in holdings if isinstance(
+            h, dict) and "score" in h and "expected_profit" in h]
 
         # ✅ 조건부 2종목 진입 시 → 자금 배분 조정
         if get_holding_count() == 1 and len(holdings) >= 1:
@@ -401,62 +411,62 @@ def run_strategy1(config):
             target_2=target2,
             target_3=target3,
             extra={
-                "max_price":entry_price,
+                "max_price": entry_price,
                 "prev_cci": indicators.get("cci", None),  # 혹은 None
-            'entry_time' : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                'entry_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
         )
 
         print(f"✅ 전략1 진입 성공! {symbol}, 진입가: {entry_price}, 수량: {quantity}")
 
-    print("📤 진입 루프 종료 → 매도 전략 실행")
-    sell_strategy1(config)
 
-    # 예측 수익률 통과 후
-    # 보조지표 값에서 RSI, OBV, MACD 추출
-    rsi_value = indicator_result.get("RSI_VALUE", 65)
-    macd_hist = indicator_result.get("MACD_HIST", 0)
-    obv_slope = indicator_result.get("OBV_SLOPE", True)
+        print("📤 진입 루프 종료 → 매도 전략 실행")
+        sell_strategy1(config)
 
-    # 단타/스윙 자동 분류
-    mode = classify_trade_mode(candles[0], rsi_value, obv_slope, macd_hist)
-    print(f"[전개방식] {symbol} → 판단 결과: {mode}")
+        # 예측 수익률 통과 후
+        # 보조지표 값에서 RSI, OBV, MACD 추출
+        rsi_value = indicator_result.get("RSI_VALUE", 65)
+        macd_hist = indicator_result.get("MACD_HIST", 0)
+        obv_slope = indicator_result.get("OBV_SLOPE", True)
 
-    # 목표 수익률 계산
-    if mode == "단타":
-        target_profit = max(2.0, expected_profit)
-    elif mode == "스윙":
-        target_profit = expected_profit + 9.0  # 또는 +5.0 정도 더해도 OK
-    else:
-        target_profit = expected_profit
+        # 단타/스윙 자동 분류
+        mode = classify_trade_mode(candles[0], rsi_value, obv_slope, macd_hist)
+        print(f"[전개방식] {symbol} → 판단 결과: {mode}")
 
-    if balance < position:
-        print(f"❌ 잔고 부족: {symbol} → 보유 KRW {balance}, 필요 {position}")
+        # 목표 수익률 계산
+        if mode == "단타":
+            target_profit = max(2.0, expected_profit)
+        elif mode == "스윙":
+            target_profit = expected_profit + 9.0  # 또는 +5.0 정도 더해도 OK
+        else:
+            target_profit = expected_profit
+
+        if balance < position:
+            print(f"❌ 잔고 부족: {symbol} → 보유 KRW {balance}, 필요 {position}")
             continue
 
-    update_balance_after_buy(position)
+        update_balance_after_buy(position)
 
-    result = {
-        "종목": symbol,
-        "전략": "strategy1",
-        "진입가": candles[0]["trade_price"],
-        "예상수익률": expected_profit,
-        "예상손익비": rr,
-        "스코어": score,
-        "진입비중": position_ratio,
-        "진입금액": position,        # 원 단위
-        "전개방식": mode,
-        "최고가": candles[0]["trade_price"],  # 진입가로 초기화
-        "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
+        result = {
+            "종목": symbol,
+            "전략": "strategy1",
+            "진입가": candles[0]["trade_price"],
+            "예상수익률": expected_profit,
+            "예상손익비": rr,
+            "스코어": score,
+            "진입비중": position_ratio,
+            "진입금액": position,        # 원 단위
+            "전개방식": mode,
+            "최고가": candles[0]["trade_price"],  # 진입가로 초기화
+            "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
 
-    selected.append(result)
+        selected.append(result)
 
-    if selected:
-        return selected[0]
+        if selected:
+            return selected[0]
 
-
-    return None
+        return None
 
 if __name__ == "__main__":
     import datetime
