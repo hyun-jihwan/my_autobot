@@ -12,6 +12,10 @@ from scanners.scanner2 import detect_strategy2_signals
 from transition.strategy3_exit import handle_strategy3_exit
 from scanners.scanner3 import detect_fast_rising_symbols
 from sell_strategies.sell_strategy2 import sell_strategy2
+from strategies.strategy1 import strategy1
+from sell_strategies.sell_strategy1 import sell_strategy1
+
+
 
 
 # 봇 실행 전 → 보유 종목 자동 복구
@@ -38,6 +42,28 @@ def run():
         now = datetime.now()
         print(f"\n[{now}] 감지 실행 중...")
 
+        try:
+            print("\n📈 [전략1 실행 시작]")
+            strategy1_result = strategy1(config)
+            if strategy1_result:
+                print(f"🎯 전략1 진입 완료: {strategy1_result['종목']}")
+            else:
+                print("⛔ 전략1 진입 조건 미충족")
+
+            print("📤 [매도 전략1 실행]")
+            sell_strategy1(config)
+
+            # 30초마다 반복
+            time.sleep(30)
+
+        except KeyboardInterrupt:
+            print("⏹️ 프로그램 수동 종료됨")
+            break
+
+        except Exception as e:
+            print(f"❌ 예외 발생: {e}")
+            time.sleep(10)
+
         # 전략2 급등 감지
         config["watchlist"] = detect_strategy2_signals()
         if config["watchlist"]:
@@ -59,7 +85,7 @@ def run():
         try:
             candles_dict = {}
             for symbol in list(balance["holdings"].keys()):
-                candles = get_candles(symbol, interval="1", count=50)
+               candles = get_candles(symbol, interval="1", count=50)  #실제 기존 캔들
                 if candles:
                     candles_dict[symbol] = candles
 
@@ -92,4 +118,6 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    run()  # ✅ 실전 루프 실행
+
+

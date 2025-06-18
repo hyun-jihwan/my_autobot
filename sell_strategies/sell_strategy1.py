@@ -3,16 +3,21 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-
-from sell_strategies.sell_utils import get_indicators
+import json
+from sell_strategies.sell_utils import get_indicators, check_sell_signal_strategy1
 from utils.balance import balance, save_holdings_to_file, remove_holding
 from utils.candle import get_candles
 
+def load_holdings_from_file():
+    with open("data/holdings.json", "r") as f:
+        return json.load(f)
+
 
 def sell_strategy1(config):
-    print("📤 매도 전략 1 실행됨")
+    print("📤 매도 전략1 실행됨")
 
-    holdings = balance["holdings"]
+    balance = load_holdings_from_file()
+    holdings = balance.get("holdings", {})
     if not holdings:
         print("⚠️ 현재 보유 중인 종목이 없습니다.")
         return
@@ -48,84 +53,6 @@ def sell_strategy1(config):
     save_holdings_to_file()
     print("📤 매도 전략 1 완료 — holdings.json 저장됨")
 
-
-def check_sell_signal_strategy1(holding, candles, indicators):
-    entry_price = holding["entry_price"]
-    expected_profit = holding.get("expected_profit")
-    current_price = candles[0]["trade_price"]
-    high_prices = [c["high_price"] for c in candles[:5]]
-    recent_high = max(high_prices)
-
-    # ➕ 수익률 계산
-    profit_rate = (current_price - entry_price) / entry_price
-
-    # 📊 지표
-    rsi = indicators["rsi"]
-    obv = indicators["obv"]
-    obv_prev = indicators["obv_prev"]
-    vwap = indicators["vwap"]
-    upper_band = indicators["bb_upper"]
-
-    # 🕯 현재 캔들 정보
-    c = candles[0]
-    close = c["trade_price"]
-    open_ = c["opening_price"]
-    high = c["high_price"]
-    body = abs(close - open_)
-    upper_wick = high - max(close, open_)
-
-    # 📈 거래량
-    v_now = c["candle_acc_trade_volume"]
-    v_avg = sum([c["candle_acc_trade_volume"] for c in candles[1:4]]) / 3
-
-    # ✅ 익절 1: 목표가 도달 → 50% 익절 + 최고가 추적 후 -0.7% 하락 시 전량 익절
-    if profit_rate >= expected_profit:
-        holding["trailing_high"] = max(high, holding.get("trailing_high", high))  # 최고가 추적
-        return "🎯 목표 수익률 도달 → 50% 익절"
-    if "trailing_high" in holding:
-        trailing_high = holding["trailing_high"]
-        if current_price <= trailing_high * 0.993:  # 0.7% 하락
-            return "📉 최고가 대비 0.7% 하락 → 전량 익절"
-
-    # ✅ 익절 2: 2개 연속 고점 실패 + 거래량 평균 대비20% 이상 감소
-    if (
-        high_prices[0] < high_prices[1] and
-        high_prices[1] < high_prices[2] and
-        v_now < v_avg * 0.8
-    ):
-        return "🔻 2개 연속 고점 실패 + 거래량 감소 → 전량 익절"
-
-    # ✅ 익절 3: 최고가 기준 0.7% 이상 하락 + RSI 하락 전환 + VWAP 이탈
-    if (
-        current_price <= recent_high * 0.993 and
-        rsi < indicators["rsi_prev"] and
-        close < vwap
-    ):
-        return "📉 최고가 하락 + RSI + VWAP 이탈 → 전량 익절"
-
-    # ✅ 익절 4: 윗꼬리 음봉 + OBV 하락 + 볼밴 상단 이탈
-    is_tail = upper_wick > body * 1.5
-    if (
-        close < open_ and
-        is_tail and
-        close > upper_band and
-        obv < obv_prev
-    ):
-        return "⚠️ 윗꼬리 음봉 + OBV 하락 + 볼밴 상단 이탈 → 전량 익절"
-
-    # ❌ 손절 1: -2% 손실
-    if current_price <= entry_price * 0.98:
-        return "❌ -2% 손실 도달 → 전량 손절"
-
-    # ❌ 손절 2: -0.7% 급락 + 음봉 + 거래량 급등
-    if (
-        current_price <= entry_price * 0.993 and
-        close < open_ and
-        v_now > v_avg * 1.3
-    ):
-        return "⚠️ 급락 + 음봉 + 거래량 급등 → 전량 손절"
-
-    return None
 
 def evaluate_swing_exit(symbol, entry_price, target_1, target_2, target_3):
     result = {"action": None, "reason": None}
@@ -240,12 +167,9 @@ def evaluate_swing_exit(symbol, entry_price, target_1, target_2, target_3):
     return result
 
 if __name__ == "__main__":
-    print("📤 매도 전략 1 테스트 시작")
-    from utils.balance import balance
-    print("보유 종목:", list(balance["holdings"].keys()))
-
-    # 가짜 config 넣어도 무방
-    sell_strategy1(config={})
-
-    print("📤 매도 전략 1 테스트 완료")
-    print("잔여 종목:", list(balance["holdings"].keys()))
+    print("🧪 [전략1 매도 조건 평가 트리거] 시작")
+    config = {
+        "operating_capital": 100000,
+        "ready_for_strategy1": False
+    }
+    sell_strategy1(config)

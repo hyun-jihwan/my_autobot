@@ -19,8 +19,7 @@ def handle_existing_holdings(config):
 
     print(f"🧾 장시작 전 보유 종목 확인: {len(holdings)}개")
 
-    for h in holdings:
-        symbol = h["symbol"]
+    for symbol, h in list(holdings.items()):
         candles = get_candles(symbol, interval="1", count=3)
         if not candles or len(candles) < 3:
             print(f"⚠️ 캔들 부족: {symbol}")
@@ -39,6 +38,6 @@ def handle_existing_holdings(config):
         current_price = get_current_price(symbol)
         quantity = h["quantity"]
         estimated_value = current_price * quantity
-        update_balance_after_sell(capital)
+        update_balance_after_sell(symbol, current_price, quantity)
         remove_holding(symbol)
         config["switch_allowed"] = 2  # 전략 내 갈아타기 최대 2회 허용 등록

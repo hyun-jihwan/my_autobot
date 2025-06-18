@@ -1,4 +1,8 @@
 # strategies/strategy2.py
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
+
 
 import datetime
 from utils.candle import get_candles
@@ -12,6 +16,8 @@ from switch_manager import has_switched_today, set_switch_today
 
 
 def is_within_strategy_time():
+    return True  # 테스트 용
+
     now = datetime.datetime.now()
     start = datetime.datetime(now.year, now.month, now.day, 9, 0)
     end = datetime.datetime(now.year, now.month, now.day, 9, 15, 59)
@@ -112,3 +118,19 @@ def run_strategy2(config):
         break  # 1종목만 진입
 
     return selected if selected else None
+
+#테스트 시작
+if __name__ == "__main__":
+    import json
+
+    config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except Exception as e:
+        print(f"❌ config.json 로드 실패: {e}")
+        config = {"operating_capital": 10000, "watchlist": ["KRW-TEST"]}
+
+    result = run_strategy2(config)
+    print(result)
+#테스트 끝

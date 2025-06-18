@@ -1,9 +1,16 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import json
+import time
 import datetime
 from utils.candle import get_candles, get_all_krw_symbols
 from utils.balance import (
     get_holding_symbols, get_holdings,
     record_holding, update_balance_after_buy,
-    update_balance_after_sell, remove_holding
+    update_balance_after_sell, remove_holding,
+    get_krw_balance
 )
 from utils.price import get_current_price
 
@@ -72,10 +79,12 @@ def run_strategy3(config):
 
     for symbol in watchlist:
         if symbol in get_holding_symbols():
+            print(f"[DEBUG] 건너뜀: 이미 보유 중인 종목 → {symbol}")
             continue  # 중복 진입 방지
 
         candles = get_candles(symbol, interval="1", count=4)
         if len(candles) < 4:
+            print(f"[DEBUG] 건너뜀: 캔들 부족 → {symbol}")
             continue
 
         c1 = candles[-2]
@@ -87,9 +96,11 @@ def run_strategy3(config):
         volume_ratio = volume_now / volume_avg if volume_avg != 0 else 0
 
         if price_change < 1.3 or volume_ratio < 2:
+            print(f"[DEBUG] 건너뜀: 상승률 {price_change:.2f}% 또는 거래량비 {volume_ratio:.2f} 불충족")
             continue
 
         if not recent_high_breakout(candles, c0["trade_price"]):
+            print(f"[DEBUG] 건너뜀: 고점 돌파 실패 → 현재가 {c0['trade_price']} vs 이전고점 {max([c['high_price'] for c in candles[:-1]])}")
             continue
 
         score = calculate_score(price_change, volume_ratio)
@@ -98,13 +109,37 @@ def run_strategy3(config):
         now = datetime.datetime.now().time()
         if now < datetime.time(18, 0) or now > datetime.time(1, 0):
             if score < 80:
+                print(f"[DEBUG] 건너뜀: 점수 {score} < 80 (낮 시간대)")
                 continue
         else:
             if score < 60:
+                print(f"[DEBUG] 건너뜀: 점수 {score} < 60 (야간)")
                 continue
 
         if not is_good_candle(c0):
+            print(f"[DEBUG] 건너뜀: 좋은 캔들 조건 미충족 → {symbol}")
             continue
+
+        # ✅ 슬리피지 제한 (이전 종가 대비 3% 이내만 진입 허용)
+        previous_close = c1["trade_price"]
+        current_price = c0["trade_price"]
+
+        print(f"[DEBUG] 이전 종가: {previous_close}, 현재가: {current_price}")
+
+        if current_price > previous_close * 1.03:
+            print(f"❌ 슬리피지 초과: {current_price} > {previous_close * 1.03}")
+            continue
+
+        # ✅ 기대 수익률 3% 이상이어야 진입
+        expected_target = current_price * 1.04  # 예시 목표가
+        expected_profit = (expected_target - current_price) / current_price
+        print(f"[DEBUG] 기대 수익률: {expected_profit:.2%}")
+
+        if expected_profit < 0.03:
+            print(f"❌ 기대 수익률 부족: {expected_profit:.2%}")
+            continue
+
+        print(f"[DEBUG] 최종 통과: {symbol} (점수: {score})")
 
         # ✅ 점수 최고 종목만 진입
         if score > best_score:
@@ -124,11 +159,14 @@ def run_strategy3(config):
         # ✅ 전략1 보유 시 청산 판단
         holdings = get_holdings()
         if holdings:
-            h = holdings[0]
+            h = list(holdings.values())[0]
             if check_strategy1_exit_conditions(h):
                 print(f"❌ 전략1 → 수익성 하락 / 박스권 → 청산 후 전략3 진입")
-                update_balance_after_sell(get_current_price(h["symbol"]) * h["quantity"])
-                remove_holding(h["symbol"])
+                symbol = h["symbol"]
+                sell_price = get_current_price(symbol)
+                quantity = h["quantity"]
+                update_balance_after_sell(symbol, sell_price, quantity)
+                remove_holding(symbol)
             else:
                 print(f"⏸ 전략1 → 유지 조건 → 전략3 진입 차단")
                 return None
@@ -139,7 +177,22 @@ def run_strategy3(config):
             print("❌ 운영 자금 부족")
             return None
 
-        quantity = capital / price
+        # 💰 현재 잔고 확인
+        current_balance = get_krw_balance()
+        if current_balance < 5000:
+            print(f"❌ 진입 실패: 현재 잔고 {current_balance:.2f}원이너무 적음")
+            return None
+
+        if current_balance < capital:
+            capital = current_balance
+
+
+        # ✅ 지정가 체결 시도 (5초 기다렸다가 시장가 진입)
+        print(f"⏳ 5초 대기 후 지정가 진입 시도 → {symbol} @ {price}")
+        time.sleep(5)
+
+
+        quantity = round(capital / price, 4)
         update_balance_after_buy(capital)
         record_holding(symbol, price, quantity, score=score, source="strategy3")
 

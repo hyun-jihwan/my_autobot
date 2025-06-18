@@ -1,6 +1,8 @@
 import requests
+import datetime
 
-def get_candles(symbol, interval="15", count=30):
+#def get_candles(symbol, interval="15", count=30):
+def get_candles(symbol, interval="1", count=16):
     """
     업비트 캔들 데이터 조회
     interval:
@@ -9,6 +11,31 @@ def get_candles(symbol, interval="15", count=30):
       - "week" → 주봉
       - "month" → 월봉
     """
+    #테스트 시작
+    if symbol == "KRW-TEST":
+        return [
+            {"opening_price": 100, "high_price": 105, "low_price": 98, "trade_price": 104, "candle_acc_trade_volume": 3000},
+            {"opening_price": 104, "high_price": 106, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2800},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2500},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2600},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2700},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2800},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2900},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3000},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3100},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3200},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3300},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3400},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3500},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3600},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3700},
+            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3800},
+            {"opening_price": 104, "high_price": 104, "low_price": 100, "trade_price": 101, "candle_acc_trade_volume": 3900}  
+        ]
+    print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: 404")
+    return []
+    #테스트 끝
+
     if interval == "day":
         url = "https://api.upbit.com/v1/candles/days"
     elif interval == "week":

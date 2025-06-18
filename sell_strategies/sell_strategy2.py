@@ -1,7 +1,13 @@
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from sell_strategies.sell_utils import get_indicators
-from utils.balance import update_balance_after_sell, clear_holdings
+from utils.balance import update_balance_after_sell, clear_holdings, remove_holding
 from utils.log_utils import log_sell
 from db.holdings import get_holding_symbols, get_holding_data
+from utils.candle import get_candles
+
 
 def sell_strategy2(candles_dict, balance):
     sell_results = []
@@ -31,7 +37,7 @@ def sell_strategy2(candles_dict, balance):
         loss_rate = (current_price - entry_price) / entry_price
         if loss_rate <= -0.02:
             update_balance_after_sell(symbol, current_price, quantity)
-            clear_holdings(symbol)
+            remove_holding(symbol)
             log_sell(symbol, current_price, "전략2 손절 (-2%)")
             sell_results.append({
                 "symbol": symbol,
@@ -77,3 +83,28 @@ def sell_strategy2(candles_dict, balance):
                 })
 
     return sell_results
+
+#테스트 시작
+if __name__ == "__main__":
+    import json
+
+    try:
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
+    except Exception as e:
+        print(f"❌ config.json 로드 실패: {e}")
+        config = {"operating_capital": 10000}
+
+    # 테스트용 전체 보유 종목 캔들 수집
+    candles_dict = {}
+    for symbol in get_holding_symbols():
+        candles = get_candles(symbol, interval="1", count=30)
+        candles_dict[symbol] = candles
+
+    # 임시 잔고 예시 (필요시 수정)
+    balance = config.get("operating_capital", 10000)
+
+    result = sell_strategy2(candles_dict, balance)
+    print("📦 전략2 청산 결과:", result)
+
+#테스트 끝

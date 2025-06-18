@@ -12,7 +12,7 @@ def try_switch():
         print("❌ 이미 갈아타기 1회 완료 (금일 제한)")
         return None, None
 
-    current = holdings[0]
+    current = list(holdings.values())[0]
     symbol = current["symbol"]
     entry_price = current["entry_price"]
     quantity = current["quantity"]

@@ -48,19 +48,35 @@ def get_krw_balance():
     return balance["KRW"]
 
 def update_balance_after_buy(amount):
+    global balance
     balance["KRW"] -= amount
+    save_holdings_to_file()
+
 
 def update_balance_after_sell(symbol, sell_price, quantity):
-    proceeds = sell_price*quantity
-    balance["total_balance"] += proceeds
+    global balance
+    proceeds = sell_price*quantity*0.999
+    balance["KRW"] += proceeds
 
-    proceeds *= 0.999
+    save_holdings_to_file()
+
+def update_holding_field(symbol, field, value):
+    global balance
+    print(f"🧪 update_holding_field 실행됨 → {symbol} / {field} = {value}")
+    if symbol in balance["holdings"]:
+        balance["holdings"][symbol][field] = value
+        print(f"🔧 {symbol} → {field} 필드 업데이트: {value}")
+        save_holdings_to_file()
+        print("💾 holdings 저장 완료")
+    else:
+        print(f"⚠️ {symbol} 존재하지 않음 → 업데이트 실패")
+
 
 def get_holdings():
     return balance["holdings"]
 
 def get_holding_symbols():
-    return [h["symbol"] for h in balance["holdings"]]
+    return [h["symbol"] for h in balance["holdings"].values()]
 
 def get_holding_count():
     return len(balance["holdings"])
@@ -79,11 +95,14 @@ def save_holdings_to_file(filepath="data/holdings.json"):
             "switched": balance.get("switched", False)
         }, f, indent=2, ensure_ascii=False)
 
+    # ✅ 여기! 저장이 끝난 후에 로그 출력
+    print("💾 holdings.json 저장 시도 완료")
+
 # ✅ record_holding 함수 내부에서 아래처럼 저장되도록 수정
 def record_holding(symbol, entry_price, quantity, score=None, expected_profit=None, source=None, entry_time=None, target_2=0, target_3=0, extra=None):
     if symbol in balance["holdings"]:
         del balance["holdings"][symbol]
-    print(f"🗑 보유 목록에서 제거됨 → {symbol}")
+        print(f"🗑 보유 목록에서 제거됨 → {symbol}")
 
     if entry_time is None:
         entry_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -129,7 +148,8 @@ def load_holdings_from_file(filepath="data/holdings.json"):
                 raise ValueError("❌ holdings.json → 딕셔너리 아님")
 
             balance["holdings"] = data.get("holdings", {})  # ✅ 리스트(X) → 딕셔너리(O)
-            balance["KRW"] = data.get("KRW", 1000000),
+            balance["KRW"] = data.get("KRW", 1000000)
+
             balance["switched"] = data.get("switched", False)
 
 
@@ -139,17 +159,21 @@ def load_holdings_from_file(filepath="data/holdings.json"):
 
 
 def reset_switch_flag():
+    global balance
     balance["switched"] = False
 
 def set_switch_flag():
+    global balance
     balance["switched"] = True
 
 def has_switched():
     return balance.get("switched", False)
 
 def remove_holding(symbol):
-    balance["holdings"] = [h for h in balance["holdings"] if h["symbol"] != symbol]
-    print(f"🗑 보유 목록에서 제거됨 → {symbol}")
+    if symbol in balance["holdings"]:
+        del balance["holdings"][symbol]
+
+        print(f"🗑 보유 목록에서 제거됨 → {symbol}")
 
 def get_current_price(symbol):
     candles = get_candles(symbol, interval="1", count=1)
