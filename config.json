@@ -1,7 +1,7 @@
 {
   "scan_interval": 300,
   "fast_scan_interval": 60,
-  "watchlist": ["KRW-TEST"],
+  "watchlist": ["KRW-A"],
   "strategy3_signals": [],
   "exchange": "upbit",
   "api_key": "YOUR_UPBIT_API_KEY",

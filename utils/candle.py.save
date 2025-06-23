@@ -1,0 +1,212 @@
+import requests
+import datetime
+
+#def get_candles(symbol, interval="15", count=30)
+def get_candles(symbol, interval="1", count=16): #테스트용
+    """
+    업비트 캔들 데이터 조회
+    interval:
+      - "1", "3", "5", "15", "30", "60", "240" → 분봉
+      - "day" → 일봉
+      - "week" → 주봉
+      - "month" → 월봉
+    """
+    #테스트 시작
+    if symbol == "KRW-A":
+        return [
+            {"opening_price": 100, "high_price": 102, "low_price": 99, "trade_price": 101, "candle_acc_trade_volume": 3000},
+            {"opening_price": 101, "high_price": 102, "low_price": 100, "trade_price": 101, "candle_acc_trade_volume": 3100},
+            {"opening_price": 101, "high_price": 103, "low_price": 100, "trade_price": 102, "candle_acc_trade_volume": 3200},
+            {"opening_price": 102, "high_price": 103, "low_price": 101, "trade_price": 102, "candle_acc_trade_volume": 3300},
+            {"opening_price": 102, "high_price": 103, "low_price": 101, "trade_price": 102, "candle_acc_trade_volume": 3400},
+            {"opening_price": 102, "high_price": 103, "low_price": 101, "trade_price": 102, "candle_acc_trade_volume": 3500},
+            {"opening_price": 102, "high_price": 103, "low_price": 101, "trade_price": 102, "candle_acc_trade_volume": 3600},
+            {"opening_price": 102, "high_price": 104, "low_price": 101, "trade_price": 103, "candle_acc_trade_volume": 3700},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 3800},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 3900},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 4000},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 4100},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 4200},
+            {"opening_price": 103, "high_price": 104, "low_price": 102, "trade_price": 103, "candle_acc_trade_volume": 4300},
+            {"opening_price": 103, "high_price": 105, "low_price": 102, "trade_price": 104, "candle_acc_trade_volume": 4400},
+            {"opening_price": 107, "high_price": 108, "low_price": 106, "trade_price": 106, "candle_acc_trade_volume": 7000},
+            {"opening_price": 108, "high_price": 110, "low_price": 108, "trade_price": 109, "candle_acc_trade_volume": 9000}
+        ]
+
+    if symbol == "KRW-B":
+        print("📊 KRW-B 캔들 호출됨")
+        return [
+            {"opening_price": 106, "high_price": 106, "low_price": 105, "trade_price": 105.0, "candle_acc_trade_volume": 3000},
+            {"opening_price": 105, "high_price": 106, "low_price": 104, "trade_price": 105.0, "candle_acc_trade_volume": 2800},
+            {"opening_price": 105, "high_price": 106, "low_price": 104, "trade_price": 105.0, "candle_acc_trade_volume": 2700},
+            {"opening_price": 105, "high_price": 106, "low_price": 104, "trade_price": 105.0, "candle_acc_trade_volume": 2600},
+            {"opening_price": 105, "high_price": 106, "low_price": 104, "trade_price": 105.0, "candle_acc_trade_volume": 2500}
+        ]
+
+    if symbol == "KRW-C":
+        print("📊 KRW-C 캔들 호출됨")
+        return [
+            {"opening_price": 108, "high_price": 109, "low_price": 107, "trade_price": 108.5, "candle_acc_trade_volume": 5000},
+            {"opening_price": 108, "high_price": 109, "low_price": 107, "trade_price": 108.4, "candle_acc_trade_volume": 4800},
+            {"opening_price": 108, "high_price": 108, "low_price": 106, "trade_price": 107.8, "candle_acc_trade_volume": 4600},
+            {"opening_price": 107.5, "high_price": 108, "low_price": 106.5, "trade_price": 107.2, "candle_acc_trade_volume": 4400},
+            {"opening_price": 107.0, "high_price": 107.5, "low_price": 106.0, "trade_price": 106.5, "candle_acc_trade_volume": 4200},
+            {"opening_price": 106.5, "high_price": 107.0, "low_price": 105.5, "trade_price": 106.0, "candle_acc_trade_volume": 4100},
+            {"opening_price": 106.0, "high_price": 106.5, "low_price": 105.0, "trade_price": 105.5, "candle_acc_trade_volume": 4000},
+            {"opening_price": 105.5, "high_price": 106.0, "low_price": 104.5, "trade_price": 105.0, "candle_acc_trade_volume": 3900},
+            {"opening_price": 105.0, "high_price": 105.5, "low_price": 104.0, "trade_price": 104.5, "candle_acc_trade_volume": 3800},
+            {"opening_price": 104.5, "high_price": 105.0, "low_price": 103.5, "trade_price": 104.0, "candle_acc_trade_volume": 3700},
+            {"opening_price": 104.0, "high_price": 104.5, "low_price": 103.0, "trade_price": 103.5, "candle_acc_trade_volume": 3600},
+            {"opening_price": 103.5, "high_price": 104.0, "low_price": 102.5, "trade_price": 103.0, "candle_acc_trade_volume": 3500},
+            {"opening_price": 103.0, "high_price": 103.5, "low_price": 102.0, "trade_price": 102.5, "candle_acc_trade_volume": 3400},
+            {"opening_price": 102.5, "high_price": 103.0, "low_price": 101.5, "trade_price": 102.0, "candle_acc_trade_volume": 3300},
+            {"opening_price": 102.0, "high_price": 102.5, "low_price": 101.0, "trade_price": 101.5, "candle_acc_trade_volume": 3200},
+            {"opening_price": 101.5, "high_price": 102.0, "low_price": 100.5, "trade_price": 101.0, "candle_acc_trade_volume": 3100}
+        ]
+
+    print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: 404")
+    return []
+    #테스트 끝
+
+    if interval == "day":
+        url = "https://api.upbit.com/v1/candles/days"
+    elif interval == "week":
+        url = "https://api.upbit.com/v1/candles/weeks"
+    elif interval == "month":
+        url = "https://api.upbit.com/v1/candles/months"
+    else:
+        url = f"https://api.upbit.com/v1/candles/minutes/{interval}"
+
+    params = {"market": symbol, "count": count}
+    headers = {"accept": "application/json"}
+
+    try:
+        response = requests.get(url, params=params, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: {response.status_code}")
+            return []
+    except Exception as e:
+        print(f"❌ {symbol} → 요청 중 예외 발생: {e}")
+        return []
+
+def is_box_breakout(candles):
+    """
+    박스권 상단 재돌파 패턴 판별
+    - 최근 5~10봉 동안 가격 변동폭이 ±1% 이내
+    - 이후 양봉 돌파 + 거래량 1.5배 이상
+    """
+    if len(candles) < 12:
+        return False
+
+    recent = candles[2:12]  # 박스 분석용 구간
+    prices = [c["trade_price"] for c in recent]
+    max_price = max(prices)
+    min_price = min(prices)
+
+    box_range = (max_price - min_price) / min_price
+    if box_range > 0.01:  # 박스폭 ±1% 이상이면 박스 아님
+        return False
+
+    current = candles[0]
+    prev = candles[1]
+
+    # 양봉 돌파 + 거래량 1.5배 이상
+    if current["trade_price"] > max_price and current["opening_price"] < current["trade_price"]:
+        if current["candle_acc_trade_volume"] > prev["candle_acc_trade_volume"] * 1.5:
+            return True
+
+    return False
+
+def is_breakout_pullback(candles):
+    """
+    돌파 후 눌림 패턴 감지
+    - 고점 돌파 후 눌림
+    - 최근 봉 양봉
+    - 거래량 전봉보다 1.2배 이상
+    """
+    if len(candles) < 6:
+        return False
+
+    prev_5 = candles[1:6]
+    high = max(c["high_price"] for c in prev_5)
+    low = min(c["low_price"] for c in prev_5)
+
+    # 현재봉 조건
+    current = candles[0]
+    prev = candles[1]
+
+    # 눌림 후 양봉 + 거래량 증가
+    if current["trade_price"] > low and current["opening_price"] < current["trade_price"]:
+        if current["candle_acc_trade_volume"] > prev["candle_acc_trade_volume"] * 1.2:
+            return True
+    return False
+
+def is_v_rebound(candles):
+    """
+    V자 반등 패턴 감지
+    - 큰 음봉 → 큰 양봉 (반전)
+    - 양봉 거래량이 음봉보다 1.2배 이상
+    """
+    if len(candles) < 3:
+        return False
+
+    down = candles[2]
+    up = candles[1]
+    now = candles[0]
+
+    # down = 긴 음봉, up = 긴 양봉
+    down_range = down["opening_price"] - down["trade_price"]
+    up_range = up["trade_price"] - up["opening_price"]
+
+    if down_range <= 0 or up_range <= 0:
+        return False
+
+    if up_range < down_range * 0.8:
+        return False  # 양봉이 충분히 크지 않음
+
+    # 거래량 조건
+    if up["candle_acc_trade_volume"] < down["candle_acc_trade_volume"] * 1.2:
+        return False
+
+    # 현재봉이 양봉 유지 중이면 V자 반등 확정
+    if now["trade_price"] > now["opening_price"]:
+        return True
+
+    return False
+
+def get_all_krw_symbols():
+    url = "https://api.upbit.com/v1/market/all"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return [item['market'] for item in data if item['market'].startswith("KRW-")]
+        else:
+            print("❌ 심볼 목록 가져오기 실패")
+            return []
+    except Exception as e:
+        print(f"❌ 심볼 요청 중 오류: {e}")
+        return []
+
+#테스트 시작
+def save_test_candles(symbol, candles, filepath="data/test_candles.json"):
+    import json
+    import os
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    all_data = {}
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            try:
+                all_data = json.load(f)
+            except:
+                all_data = {}
+
+    all_data[symbol] = candles
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+
+    print(f"🕯 테스트 캔들 저장 완료 → {symbol}")
+#테스트 끝

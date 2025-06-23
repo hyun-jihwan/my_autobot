@@ -17,7 +17,7 @@ def sell_strategy2(candles_dict, balance):
         if candles is None or len(candles) < 15:
             continue
 
-        indicators = get_indicators(candles)
+        indicators = get_indicators(symbol, candles)
         if not indicators:
             continue
 
@@ -51,30 +51,52 @@ def sell_strategy2(candles_dict, balance):
         if trail_rate >= 0.02:
             condition_count = 0
 
+            # 🧪 로그: 기본 정보 출력
+            print(f"🧪 진입가: {entry_price} / 최고가: {max_price} / 현재가: {current_price}")
+            print(f"🧪 trail_rate: {trail_rate:.4f}")
+
+
             # 조건 1: VWAP 이탈
             if current_price < indicators["vwap"]:
                 condition_count += 1
+                print("✅ 조건 1 통과: 현재가 < VWAP")
+            else:
+                print("❌ 조건 1 불충족: 현재가 >= VWAP")
 
             # 조건 2: 볼린저 상단 돌파 후 복귀
             bb_upper = indicators.get("bb_upper")
             prev_high = candles[-2]["high_price"]
             if bb_upper and prev_high > bb_upper and current_price < bb_upper:
                 condition_count += 1
+                print("✅ 조건 2 통과: 볼밴 상단 복귀")
+            else:
+                print("❌ 조건 2 불충족")
+
 
             # 조건 3: CCI 급락
             cci = indicators.get("cci")
             if prev_cci is not None and prev_cci > 100 and cci is not None and cci < 80:
                 condition_count += 1
+                print("✅ 조건 3 통과: CCI 급락")
+            else:
+                print("❌ 조건 3 불충족")
+
             holding["prev_cci"] = cci  # 상태 업데이트 필요
 
             # 조건 4: OBV 하락 반전
             if indicators["obv_prev"] > indicators["obv"]:
                 condition_count += 1
+                print("✅ 조건 4 통과: OBV 하락")
+            else:
+                print("❌ 조건 4 불충족")
+
+
+            print(f"🧮 통과된 조건 수: {condition_count}")
 
             # 조건 2개 이상 만족 → 익절
             if condition_count >= 2:
                 update_balance_after_sell(symbol, current_price, quantity)
-                clear_holdings(symbol)
+                remove_holding(symbol)
                 log_sell(symbol, current_price, f"전략2 익절 (지표 {condition_count}개 충족)")
                 sell_results.append({
                     "symbol": symbol,

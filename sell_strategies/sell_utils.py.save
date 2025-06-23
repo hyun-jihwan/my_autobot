@@ -3,52 +3,49 @@
 def get_indicators(symbol, candles):
     #테스트용
     if symbol == "KRW-A":
-        print("✅ candles 구조 확인:", type(candles), candles[:1])
         return {
-            "rsi": 75,
-            "rsi_prev": 90,
-            "vwap": 110.5,          # 현재가(101.5) < VWAP → 조건 1 충족
-            "bb_upper": 110.5,      # 고가(104) > 상단 & 현재가 101.5 < 상단 → 조건 2 충족
-            "cci": 75,              # 이전 >100 / 현재 75 → 조건 3 충족
-            "obv": 30000,
-            "obv_prev": 32000      # OBV 하락 → 조건 4 충족
+            "vwap": 107.0,          # 현재가(101.5) < VWAP → 조건 1 충족
+            "bb_upper": 109.0,      # 고가(104) > 상단 & 현재가 101.5 < 상단 → 조건 2 충족
+            "cci": 7,              # 이전 >100 / 현재 75 → 조건 3 충족
+            "obv": 10000,
+            "obv_prev": 10500      # OBV 하락 → 조건 4 충족
         }
-
     #테스트 끝
     close_prices = [c["trade_price"] for c in candles]
     volumes = [c["candle_acc_trade_volume"] for c in candles]
+    obvs = []
 
     # ✅ VWAP 계산
     total_volume = sum(volumes)
     total_price_volume = sum([c["trade_price"] * c["candle_acc_trade_volume"] for c in candles])
-    vwap = total_price_volume / total_volume if total_volume else close_prices[-1]
+    vwap = total_price_volume / total_volume if total_volume != 0 else close_prices[0]
 
     # ✅ RSI 계산 (간단 계산)
-    gains, losses = [], []
+    gains = []
+    losses = []
     for i in range(1, len(close_prices)):
         diff = close_prices[i] - close_prices[i - 1]
-        (gains if diff > 0 else losses).append(abs(diff))
+        if diff > 0:
+            gains.append(diff)
+        elif diff < 0:
+            losses.append(abs(diff))
 
-    avg_gain = sum(gains) / len(gains) if gains else 0.0001
-    avg_loss = sum(losses) / len(losses) if losses else 0.0001
+    # 예외 처리: 분모가 0이면 기본값으로 처리
+    if len(gains) == 0:
+        avg_gain = 0.0001
+    else:
+        avg_gain = sum(gains) / len(gains)
+
+    if len(losses) == 0:
+        avg_loss = 0.0001
+    else:
+        avg_loss = sum(losses) / len(losses)
+
     rs = avg_gain / avg_loss
     rsi = 100 - (100 / (1 + rs))
 
-    # rsi_prev
-    if len(close_prices) >= 3:
-        diff_prev = close_prices[-2] - close_prices[-3]
-        gain_prev = diff_prev if diff_prev > 0 else 0
-        loss_prev = -diff_prev if diff_prev < 0 else 0
-        avg_gain_prev = gain_prev or 0.0001
-        avg_loss_prev = loss_prev or 0.0001
-        rs_prev = avg_gain_prev / avg_loss_prev
-        rsi_prev = 100 - (100 / (1 + rs_prev))
-    else:
-        rsi_prev = rsi
-
-
     # ✅ OBV 계산
-    obv, obvs = 0, []
+    obv = 0
     prev_close = close_prices[0]
     for i in range(1, len(close_prices)):
         if close_prices[i] > prev_close:
@@ -57,8 +54,11 @@ def get_indicators(symbol, candles):
             obv -= volumes[i]
         prev_close = close_prices[i]
         obvs.append(obv)
+
     obv_now = obvs[-1] if obvs else 0
     obv_prev = obvs[-2] if len(obvs) >= 2 else obv_now
+    obv_peak = max(obvs) if obvs else obv_now
+    obv_reversal = obv_now < obv_peak * 0.99  # OBV 고점에서 1% 이상 하락하면 하락 전환 판단
 
 
     # CCI 계산 (14개 기준)
@@ -162,20 +162,22 @@ def get_indicators(symbol, candles):
 
 
 def check_sell_signal_strategy1(holding, candles, indicators):
-    """
-    단타 매도 조건 확인
-    """
-    symbol = holding["symbol"]
+
+    # ✅ 테스트용 강제 매도 조건 (임시)
+    if holding["symbol"] == "KRW-TEST":
+        return "🧪 테스트용 심볼 — 강제 매도 조건 통과"
+
     entry_price = holding["entry_price"]
     expected_profit = holding.get("expected_profit")
     current_price = candles[0]["trade_price"]
     high_prices = [c["high_price"] for c in candles[:5]]
     recent_high = max(high_prices)
 
+    # ➕ 수익률 계산
+    profit_rate = (current_price - entry_price) / entry_price
 
     # 📊 지표
     rsi = indicators["rsi"]
-    rsi_prev = indicators["rsi_prev"]
     obv = indicators["obv"]
     obv_prev = indicators["obv_prev"]
     vwap = indicators["vwap"]
@@ -193,130 +195,51 @@ def check_sell_signal_strategy1(holding, candles, indicators):
     v_now = c["candle_acc_trade_volume"]
     v_avg = sum([c["candle_acc_trade_volume"] for c in candles[1:4]]) / 3
 
-
-    # ✅ 손절 먼저 체크
-    if current_price <= entry_price * 0.98:
-        return "❌ -2% 손실 도달 → 전량 손절"
-
-    if (
-        current_price <= entry_price * 0.993 and
-        close < open_ and
-        v_now > v_avg * 1.3
-    ):
-        return "⚠️ 급락 + 음봉 + 거래량 급등 → 전량 손절"
-
-
-    # ✅ 익절 조건
-    profit_rate = (current_price - entry_price) / entry_price
-
-
     # ✅ 익절 1: 목표가 도달 → 50% 익절 + 최고가 추적 후 -0.7% 하락 시 전량 익절
-    if expected_profit and profit_rate >= expected_profit:
+    if profit_rate >= expected_profit:
         holding["trailing_high"] = max(high, holding.get("trailing_high", high))  # 최고가 추적
         return "🎯 목표 수익률 도달 → 50% 익절"
-
     if "trailing_high" in holding:
         trailing_high = holding["trailing_high"]
         if current_price <= trailing_high * 0.993:  # 0.7% 하락
             return "📉 최고가 대비 0.7% 하락 → 전량 익절"
 
     # ✅ 익절 2: 2개 연속 고점 실패 + 거래량 평균 대비20% 이상 감소
-    if high_prices[0] < high_prices[1] and high_prices[1] < high_prices[2] and v_now < v_avg * 0.8:
+    if (
+        high_prices[0] < high_prices[1] and
+        high_prices[1] < high_prices[2] and
+        v_now < v_avg * 0.8
+    ):
         return "🔻 2개 연속 고점 실패 + 거래량 감소 → 전량 익절"
 
     # ✅ 익절 3: 최고가 기준 0.7% 이상 하락 + RSI 하락 전환 + VWAP 이탈
-    if current_price <= recent_high * 0.993 and rsi < rsi_prev and close < vwap:
+    if (
+        current_price <= recent_high * 0.993 and
+        rsi < indicators["rsi_prev"] and
+        close < vwap
+    ):
         return "📉 최고가 하락 + RSI + VWAP 이탈 → 전량 익절"
 
     # ✅ 익절 4: 윗꼬리 음봉 + OBV 하락 + 볼밴 상단 이탈
     is_tail = upper_wick > body * 1.5
-    if close < open_ and is_tail and close > upper_band and obv < obv_prev:
+    if (
+        close < open_ and
+        is_tail and
+        close > upper_band and
+        obv < obv_prev
+    ):
         return "⚠️ 윗꼬리 음봉 + OBV 하락 + 볼밴 상단 이탈 → 전량 익절"
 
-    return None
+    # ❌ 손절 1: -2% 손실
+    if current_price <= entry_price * 0.98:
+        return "❌ -2% 손실 도달 → 전량 손절"
 
-def check_sell_signal_strategy_swing(holding, candles, indicators):
-    entry = holding["entry_price"]
-    target_1 = holding.get("target_2")
-    target_2 = holding.get("target_3")
-    target_3 = holding.get("target_3")  # 동일 값 유지
-
-    current = candles[0]
-    current_price = current["trade_price"]
-    volume_now = current["candle_acc_trade_volume"]
-    open_ = current["opening_price"]
-
-    # 손절 조건
-    if current_price <= entry * 0.98:
-        return "❌ 진입가 -2% 손절"
+    # ❌ 손절 2: -0.7% 급락 + 음봉 + 거래량 급등
     if (
-        current_price <= entry * 0.993 and
-        current_price < open_ and
-        volume_now > candles[1]["candle_acc_trade_volume"] * 1.5
+        current_price <= entry_price * 0.993 and
+        close < open_ and
+        v_now > v_avg * 1.3
     ):
-        return "❌ 급락 + 음봉 + 거래량 급등 → 손절"
-
-    # ✅ 1차 목표가 도달
-    if target_1 and current_price >= target_1:
-        highs = [c["high_price"] for c in candles[-3:-1]]
-        is_breakout = current_price > max(highs)
-        high5 = max(c["high_price"] for c in candles[-5:])
-        retrace = (high5 - current_price) / high5
-        avg_vol = sum([c["candle_acc_trade_volume"] for c in candles[-4:-1]]) / 3
-
-        if is_breakout and retrace <= 0.0382 and volume_now >= avg_vol:
-            return "✅ 1차 목표가 도달 + 조건 충족 → 유지"
-        else:
-            return "✅ 1차 목표가 도달 → 40% 분할 익절"
-
-    # ✅ 2차 목표가 도달
-    if target_2 and current_price >= target_2:
-        highs = [c["high_price"] for c in candles[-3:-1]]
-        is_breakout = current_price > max(highs)
-        avg_vol = sum([c["candle_acc_trade_volume"] for c in candles[-4:-1]]) / 3
-        ma = sum([c["trade_price"] for c in candles]) / len(candles)
-        std = (sum([(c["trade_price"] - ma) ** 2 for c in candles]) / len(candles)) ** 0.5
-        bb_upper = ma + 2 * std
-
-        if current_price > bb_upper and is_breakout and volume_now >= avg_vol:
-            return "✅ 2차 목표가 + 조건 충족 → 3차 목표가까지 유지"
-        else:
-            return "✅ 2차 목표가 도달 → 전량 익절"
-
-    # ✅ 3차 목표가 도달 → 전량 익절
-    if target_3 and current_price >= target_3:
-        return "✅ 3차 목표가 도달 → 전량 익절"
-
-    # ✅ 3차 목표가 도달 실패 + 2시간 고점 갱신 실패
-    if target_3:
-        touches = sum(1 for c in candles[:12] if c["high_price"] >= target_3)
-        recent_high = max([c["high_price"] for c in candles[1:9]])
-        if touches >= 2 and recent_high < target_3:
-            return "❌ 3차 목표가 도달 실패 + 2시간 고점 미갱신 → 전량 익절"
-
-    # ✅ 보조지표 A그룹 조건
-    A_trigger = (
-        (indicators["obv"] < indicators["obv_prev"] and indicators["is_shooting_star"]) or
-        indicators.get("vwap_break_2bars", False)
-    )
-
-    # ✅ B 그룹 조건 체크 (3개 중 2개 이상)
-    B_count = 0
-    if indicators.get("macd_dead_cross"): B_count += 1
-    if indicators.get("rsi") < 70 and indicators.get("rsi_prev", 80) > 70: B_count += 1
-    if indicators.get("bb_middle_break_down"): B_count += 1
-
-    if A_trigger or B_count >= 2:
-        return "⚠️ 보조지표 조건 충족 (A or B) → 전량 익절"
-
-    # ✅ 최근 지지선 이탈 + 거래량 증가
-    if len(candles) >= 5:
-        recent_lows = [c["low_price"] for c in candles[1:5]]
-        support = min(recent_lows)
-        if (
-            current["low_price"] < support and
-            volume_now > candles[1]["candle_acc_trade_volume"]
-        ):
-            return "📉 단기 지지선 이탈 + 거래량 증가 → 전량 익절"
+        return "⚠️ 급락 + 음봉 + 거래량 급등 → 전량 손절"
 
     return None

@@ -1,0 +1,18 @@
+{
+  "KRW-A": [
+    {
+      "opening_price": 108.0,
+      "high_price": 110.0,
+      "low_price": 107.0,
+      "trade_price": 106.5,
+      "candle_acc_trade_volume": 7000
+    },
+    {
+      "opening_price": 109.0,
+      "high_price": 112.0,
+      "low_price": 108.0,
+      "trade_price": 111.0,
+      "candle_acc_trade_volume": 9500
+    }
+  ]
+}

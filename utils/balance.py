@@ -41,24 +41,45 @@ except Exception as e:
 
 
 def clear_holdings():
-    global holdings
-    holdings = []
+    balance["holdings"] = {}
+    save_holdings_to_file()
+    print("🧹 보유 종목 전체 제거 완료 (clear_holdings)")
 
 def get_krw_balance():
     return balance["KRW"]
 
 def update_balance_after_buy(amount):
     global balance
-    balance["KRW"] -= amount
-    save_holdings_to_file()
+    fee_rate = 0.0005  # 0.05%
+    total_spent = amount * (1 + fee_rate)
+
+    try:
+        if balance["KRW"] < total_spent:
+            raise ValueError(f"잔고 부족: KRW={balance['KRW']} < 사용액={total_spent}")
+        balance["KRW"] -= total_spent
+        save_holdings_to_file()
+    except Exception as e:
+        print(f"❌ 매수 잔고 차감 실패: {e}")
+        record_failed_trade("buy", "UNKNOWN", amount, 0, str(e))
 
 
-def update_balance_after_sell(symbol, sell_price, quantity):
+def update_balance_after_sell(symbol, sell_price, quantity, quantity, retries=1):
     global balance
-    proceeds = sell_price*quantity*0.999
-    balance["KRW"] += proceeds
-
-    save_holdings_to_file()
+    fee_rate = 0.0005  # 0.05%
+    for attempt in range(retries + 1):
+        try:
+            proceeds = sell_price * quantity * (1 - fee_rate)
+            balance["KRW"] += proceeds
+            remove_holding(symbol)
+            save_holdings_to_file()
+            return  # 성공 시 종료
+        except Exception as e:
+            print(f"⚠️ 매도 처리 실패 [{attempt+1}/{retries+1}]: {e}")
+            if attempt < retries:
+                print("🔁 3초 후 재시도...")
+                time.sleep(3)
+            else:
+                record_failed_trade("sell", symbol, sell_price, quantity, str(e))
 
 def update_holding_field(symbol, field, value):
     global balance
@@ -117,8 +138,9 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
         "expected_profit": expected_profit,
         "target_2": target_2,
         "target_3": target_3,
-        "entry_time": entry_time
-    }
+        "entry_time": entry_time,
+        "source": source
+   }
 
     if extra:
         holding.update(extra)
@@ -140,23 +162,31 @@ def record_holding(symbol, entry_price, quantity, score=None, expected_profit=No
 # 🔁 재시작 시 복구용 로드 함수
 def load_holdings_from_file(filepath="data/holdings.json"):
     if not os.path.exists(filepath):
-        return
+        print("📁 holdings.json 파일 없음 → 빈 구조 리턴")
+        return {
+            "holdings": {},
+            "KRW": 1000000,
+            "switched": False
+        }
+
     with open(filepath, "r", encoding="utf-8") as f:
         try:
             data = json.load(f)
             if not isinstance(data, dict):
                 raise ValueError("❌ holdings.json → 딕셔너리 아님")
-
-            balance["holdings"] = data.get("holdings", {})  # ✅ 리스트(X) → 딕셔너리(O)
-            balance["KRW"] = data.get("KRW", 1000000)
-
-            balance["switched"] = data.get("switched", False)
-
-
             print("🔄 holdings.json → 보유 종목 복구 완료")
+            return {
+                "holdings": data.get("holdings", {}),
+                "KRW": data.get("KRW", 1000000),
+                "switched": data.get("switched", False)
+            }
         except Exception as e:
             print(f"❌ holdings.json 로드 실패: {e}")
-
+            return {
+                "holdings": {},
+                "KRW": 1000000,
+                "switched": False
+            }
 
 def reset_switch_flag():
     global balance
@@ -169,9 +199,26 @@ def set_switch_flag():
 def has_switched():
     return balance.get("switched", False)
 
+def load_holdings(filepath="data/holdings.json"):
+    if not os.path.exists(filepath):
+        return {
+            "KRW": 1000000,
+            "holdings": {},
+            "switched": False
+        }
+    with open(filepath, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+def save_holdings(data, filepath="data/holdings.json"):
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    print("💾 holdings.json 저장 시도 완료")
+
+
 def remove_holding(symbol):
     if symbol in balance["holdings"]:
         del balance["holdings"][symbol]
+        save_holdings_to_file()
 
         print(f"🗑 보유 목록에서 제거됨 → {symbol}")
 
@@ -180,3 +227,31 @@ def get_current_price(symbol):
     if candles:
         return candles[0]["trade_price"]
     return 0
+
+
+def record_failed_trade(action, symbol, price, quantity, reason):
+    log_path = "logs/failed_trades.json"
+    os.makedirs("logs", exist_ok=True)
+    
+    log = {
+        "time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "action": action,
+        "symbol": symbol,
+        "price": price,
+        "quantity": quantity,
+        "reason": reason
+    }
+
+    # 파일 있으면 기존 로그 불러오기
+    if os.path.exists(log_path):
+        with open(log_path, "r", encoding="utf-8") as f:
+            try:
+                logs = json.load(f)
+            except:
+                logs = []
+    else:
+        logs = []
+
+    logs.append(log)
+    with open(log_path, "w", encoding="utf-8") as f:
+        json.dump(logs, f, indent=2, ensure_ascii=False)

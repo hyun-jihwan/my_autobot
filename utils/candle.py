@@ -1,8 +1,10 @@
+import time
 import requests
 import datetime
 
-#def get_candles(symbol, interval="15", count=30):
-def get_candles(symbol, interval="1", count=16):
+#def get_candles(symbol, interval="15", count=30, max_retries=3, retry_delay=1.0):
+def get_candles(symbol, interval="15", count=30): #테스트용
+    print(f"📊 get_candles 호출됨 → symbol: {symbol}, interval: {interval}, count: {count}")
     """
     업비트 캔들 데이터 조회
     interval:
@@ -12,28 +14,29 @@ def get_candles(symbol, interval="1", count=16):
       - "month" → 월봉
     """
     #테스트 시작
-    if symbol == "KRW-TEST":
+    if symbol == "KRW-A" and interval == "1":
+        print("📊 KRW-A 캔들 호출됨")
         return [
-            {"opening_price": 100, "high_price": 105, "low_price": 98, "trade_price": 104, "candle_acc_trade_volume": 3000},
-            {"opening_price": 104, "high_price": 106, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2800},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2500},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2600},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2700},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2800},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 2900},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3000},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3100},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3200},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3300},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3400},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3500},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3600},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3700},
-            {"opening_price": 104, "high_price": 105, "low_price": 103, "trade_price": 104, "candle_acc_trade_volume": 3800},
-            {"opening_price": 104, "high_price": 104, "low_price": 100, "trade_price": 101, "candle_acc_trade_volume": 3900}  
+            # 이전 15개 캔들 - 보통 흐름
+            {
+                "opening_price": 98.0 + i,
+                "high_price": 98.3 + i,
+                "low_price": 97.8 + i,
+                "trade_price": 98.2 + i,
+                "candle_acc_trade_volume": 9000 + i * 500
+            } for i in range(15)
+        ] + [
+            # 현재 캔들 - 고점 돌파 + 거래량 급증 + 상승 캔들
+            {
+                "opening_price": 112.0,
+                "high_price": 114.0,  # 고점 돌파
+                "low_price": 111.5,
+                "trade_price": 113.5,
+                "candle_acc_trade_volume": 26000  # 직전 대비 충분히 높음
+            }
         ]
-    print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: 404")
-    return []
+    print(f"❌ 캔들 응답 실패 → {symbol} / interval: {interval}")
+    return 
     #테스트 끝
 
     if interval == "day":
@@ -48,16 +51,22 @@ def get_candles(symbol, interval="1", count=16):
     params = {"market": symbol, "count": count}
     headers = {"accept": "application/json"}
 
-    try:
-        response = requests.get(url, params=params, headers=headers)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: {response.status_code}")
-            return []
-    except Exception as e:
-        print(f"❌ {symbol} → 요청 중 예외 발생: {e}")
-        return []
+    attempt = 0
+    while attempt < max_retries:
+        try:
+            response = requests.get(url, params=params, headers=headers, timeout=3)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                print(f"❌ {symbol} → 캔들 응답 실패 / 상태코드: {response.status_code}")
+        except Exception as e:
+            print(f"⚠️ API 요청 실패: {e} / 재시도: {attempt+1}")
+        attempt += 1
+        time.sleep(retry_delay)
+
+    print(f"❌ {symbol} → 모든 재시도 실패. 빈 리스트 반환")
+    return []
+
 
 def is_box_breakout(candles):
     """
@@ -158,3 +167,25 @@ def get_all_krw_symbols():
         print(f"❌ 심볼 요청 중 오류: {e}")
         return []
 
+#테스트 시작
+# ✅ candle.py 맨 아래쪽에 테스트용 캔들 저장 함수 추가
+
+def save_test_candles(symbol, candles, filepath="data/test_candles.json"):
+    import json
+    import os
+    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    
+    all_data = {}
+    if os.path.exists(filepath):
+        with open(filepath, "r", encoding="utf-8") as f:
+            try:
+                all_data = json.load(f)
+            except:
+                all_data = {}
+
+    all_data[symbol] = candles
+    with open(filepath, "w", encoding="utf-8") as f:
+        json.dump(all_data, f, indent=2, ensure_ascii=False)
+
+    print(f"🕯 테스트 캔들 저장 완료 → {symbol}")
+#테스트 끝

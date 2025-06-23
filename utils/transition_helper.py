@@ -9,6 +9,8 @@ from sell_strategies.sell_utils import get_indicators
 
 def evaluate_exit(symbol, quantity, source):
     print(f"📌 [{source}] 잔여 종목 평가 → {symbol}")
+    print(f"🔍 evaluate_exit 실행 → symbol: {symbol}, source: {source}")
+    print(f"🔧 [테스트용] evaluate_exit 강제 True → {symbol}")
 
     candles_15 = get_candles(symbol, interval="15", count=20)
     if not candles_15 or len(candles_15) < 2:
@@ -39,7 +41,7 @@ def evaluate_exit(symbol, quantity, source):
         save_holdings_to_file()
 
     # ✅ VWAP, OBV 계산
-    indicators = get_indicators(candles_15)
+    indicators = get_indicators(symbol, candles_15)
 
     vwap = indicators.get("vwap")
     obv = indicators.get("obv")
@@ -67,12 +69,10 @@ def evaluate_exit(symbol, quantity, source):
     range_ratio = (high - low) / current_price * 100 if current_price else 0
 
     if is_swing:
-        print(f"✅ 스윙 조건 충족 → 유지")
-        return True
+        print(f"✅ 스윙 조건 충족 →전략1로 전환")
 
     elif range_ratio >= 1.5 and body >= (high - low) * 0.3:
-        print(f"✅ 단타 조건 충족 → 유지")
-        return True
+        print(f"✅ 단타 조건 충족 →전략1로 전환")
 
     else:
         print(f"❌ 조건 미충족 → 시장가 청산")
@@ -80,3 +80,4 @@ def evaluate_exit(symbol, quantity, source):
         update_balance_after_sell(symbol, current_price, quantity)
         remove_holding(symbol)
         return False
+

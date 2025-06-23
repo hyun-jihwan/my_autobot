@@ -5,7 +5,7 @@ import requests
 def get_current_price(symbol):
     #테스트 시작
     if symbol == "KRW-TEST":
-        return 101.0  # 진입가 100 기준 손절 유도
+        return 102.5  # 진입가 100 기준 손절 유도
     #테스트 끝
 
     url = f"https://api.upbit.com/v1/ticker?markets={symbol}"
