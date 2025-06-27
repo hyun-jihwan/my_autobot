@@ -1,19 +1,5 @@
 {
-  "holdings": {
-    "KRW-A": {
-      "symbol": "KRW-A",
-      "entry_price": 113.5,
-      "quantity": 881.0572687224669,
-      "max_price": 113.5,
-      "prev_cci": null,
-      "score": null,
-      "expected_profit": null,
-      "target_2": 0,
-      "target_3": 0,
-      "entry_time": "2025-06-21 11:31:34",
-      "source": "strategy2"
-    }
-  },
-  "KRW": -20.201987799999188,
+  "holdings": {},
+  "KRW": 1003781.576241,
   "switched": false
 }

@@ -1,6 +1,10 @@
 # switch_logic.py
 import datetime
-from utils.balance import get_holdings, update_balance_after_sell, clear_holdings, save_holdings_to_file, update_balance_after_buy, record_holding
+from utils.balance import (
+    get_holdings, update_balance_after_sell,
+    clear_holdings, save_holdings_to_file,
+    update_balance_after_buy, record_holding
+)
 from utils.candle import get_candles
 from switch_manager import has_switched_today, set_switch_today
 from external_api import get_top_gainer
@@ -20,12 +24,18 @@ def try_switch():
     quantity = current["quantity"]
 
     # 📊 현재가 + 거래량 불러오기
-    current_candle = get_candles(symbol, interval="1", count=1)[0]
+    candles = get_candles(symbol, interval="1", count=2)
+
+    # 안전 검사
+    if len(candles) < 2:
+        print(f"❌ 캔들 부족 → {symbol} / count=2")
+        return None, None
+
+    previous_candle = candles[-2]  # 직전 캔들
+    current_candle = candles[-1]   # 현재 캔들
+
     now_price = current_candle["trade_price"]
     now_volume = current_candle["candle_acc_trade_volume"]
-
-    # 📊 직전 캔들
-    previous_candle = get_candles(symbol, interval="1", count=2)[1]
     prev_volume = previous_candle["candle_acc_trade_volume"]
 
     # 오차 여유값 설정
@@ -37,11 +47,10 @@ def try_switch():
     volume_ratio = now_volume / prev_volume if prev_volume > 0 else 1
 
     # 정체 흐름 체크 (최근 5분간 고점 못 넘김)
-    candles = get_candles(symbol, interval="1", count=5)
     recent_highs = [c["high_price"] for c in candles]
-    is_stagnant = max(recent_highs) <= entry_price * 1.005
+    is_stagnant = max(recent_highs) <= entry_price * (1 + 0.005)
 
-    if price_change <= -0.01 or is_stagnant:
+    if price_change <= (-0.01 + PRICE_BUFFER) or is_stagnant:
         print(f"⚠️ {symbol} → 수익률 {price_change:.2%}, 정체: {is_stagnant} → 갈아타기 실행")
         update_balance_after_sell(symbol, now_price, quantity)
         clear_holdings()
@@ -50,7 +59,7 @@ def try_switch():
         print(f"✅ {symbol} 청산 완료. 갈아타기 가능")
         return symbol, "switched"  # 방금 청산한 종목명 반환
 
-    elif price_change >= 0.013 and volume_ratio >= 1.5:
+    elif price_change >= (0.013 - PRICE_BUFFER) and volume_ratio >= (1.5 - VOLUME_BUFFER):
         print(f"✅ {symbol} 급등 흐름 → 전략만 'strategy2'로 전환")
         # 보유 종목은 그대로, 전략 전환만 허용
         save_holdings_to_file()
@@ -95,10 +104,17 @@ def should_switch_to_other(symbol, entry_price, entry_time):
 def execute_switch_to_new(symbol, current_price, quantity, new_symbol, config):
     print(f"🚨 {symbol} → 갈아타기 실행 → {new_symbol}")
 
+    # ✅ 전략 전환이므로 자본 무시하도록 설정
+    config["strategy_switch_mode"] = True  # ← 이 줄 추가
+
     update_balance_after_sell(symbol, current_price, quantity)
     clear_holdings()
 
     candles = get_candles(new_symbol, interval="1", count=1)
+    if not candles:
+        print(f"❌ {new_symbol} 캔들 조회 실패")
+        return
+
     entry_price = candles[-1]["trade_price"]
     quantity = config["operating_capital"] / entry_price
     update_balance_after_buy(config["operating_capital"])

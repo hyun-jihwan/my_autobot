@@ -1,5 +1,6 @@
 import sys
 import os
+import math
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
@@ -14,7 +15,7 @@ from utils.filter import get_top_rising_symbols
 from utils.risk import judge_trade_type
 from utils.risk import calculate_swing_target_with_fibonacci, calculate_scalping_target
 from utils.balance import get_holdings, update_balance_after_sell
-from utils.balance import get_holding_symbols, get_holding_count, get_holding_info, remove_holding
+from utils.balance import get_holding_symbols, get_holding_count, get_holding_info, remove_holding, get_max_buyable_amount
 from utils.balance import get_krw_balance, update_balance_after_buy, record_holding, save_holdings_to_file
 from utils.position import assign_position_size
 from utils.signal import classify_trade_mode
@@ -30,36 +31,67 @@ from utils.fibonacci_target import calculate_fibonacci_targets
 def strategy1(config):
     print("📥 전략1 실행 시작")
 
-    # 실전용 자본 설정
-    total_krw_balance = get_krw_balance()
-    print(f"💰 현재 총 보유 KRW 잔고: {total_krw_balance:,.0f}원")
+    symbol = "KRW-B"  # 테스트용
 
-    capital = 10000
-    print(f"⚙️ 전략에 사용할 운영자금: {capital:,.0f}원")
+    # ✅ 전략 전환 모드 감지 시 → 보유 종목만 업데이트 후 종료
+    if config.get("strategy_switch_mode", False):
+        print(f"🔁 전환 모드 감지됨 → strategy1 전략만 덮어쓰기 진행 중")
 
-    if capital > total_krw_balance:
-        print("❌ 보유 잔고보다 많은 금액을 설정했습니다.")
-        return None
+        holding = get_holding_info().get(symbol)
+        if holding:
+            holding["score"] = "strategy1"
+            holding["expected_profit"] = 0.05
+            holding["target_2"] = 110
+            holding["target_3"] = 120
+            holding["source"] = "strategy1"
 
-    if capital < 1000:
-        print("❌ 자본 부족으로 진입 불가")
-        return None
+            if "extra" not in holding:
+                holding["extra"] = {}
 
-    # 심플하게 가정된 진입 조건
-    symbol = "KRW-A"  # ← 테스트 강제 진입
-    #symbol = get_top_rising_symbols(limit=35)[0]
+            holding["extra"]["mode"] = "단타"
+            holding["extra"]["entry_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    candles = get_candles(symbol, interval="60", count=10)
+            save_holdings_to_file()
+
+            print(f"✅ 전략1로 전략 전환 완료 → {symbol}")
+            return {
+                "종목": symbol,
+                "전략": "strategy1",
+                "전환모드": True,
+                "진입가": holding["entry_price"],
+                "진입시간": holding["extra"]["entry_time"]
+            }
+
+        else:
+            print("⚠️ 전략 전환 모드이나 기존 보유 정보 없음 → 신규 진입으로 전환")
+            return None
+
+    candles = get_candles(symbol, interval="15", count=30)
     if not candles or len(candles) < 1:
         print(f"❌ 캔들 데이터 부족: {symbol}")
         return None
 
-    entry_price = candles[0]["trade_price"]
-    position = capital
-    quantity = round(position / entry_price, 3)
+    current_price = candles[-1]["trade_price"]
+    entry_price = current_price
+    fee_rate = 0.0005
+    capital = config["operating_capital"]
 
-    # 잔고 차감
-    update_balance_after_buy(position)
+    # 수수료까지 고려한 최대 구매 가능 금액
+    max_spend = capital / (1 + fee_rate)
+    quantity = math.floor((max_spend / entry_price) * 10000) / 10000
+    used_krw = round(quantity * entry_price * (1 + fee_rate), 2)
+
+    # ✅ 실제 잔고가 충분할 경우에만 진입
+    if used_krw > capital:
+        print(f"❌ 진입 실패: 총 사용액({used_krw:.2f}) > 운영자금({capital:.2f})")
+        return None
+
+    # ✅ 잔고 차감 먼저 → 실패 시 record_holding 실행 안됨
+    try:
+        update_balance_after_buy(used_krw)
+    except Exception as e:
+        print(f"❌ 매수 실패: {e}")
+        return None
 
     # 보유 등록
     record_holding(
@@ -73,16 +105,17 @@ def strategy1(config):
         score="strategy1",
         extra={
             "entry_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "max_price": entry_price
+            "max_price": entry_price,
         }
     )
 
 
-    print(f"✅ 전략1 진입 성공: {symbol} / 진입가: {entry_price} / 수량: {quantity}")
+    print(f"✅ 전략1 진입 성공: {symbol} / 진입가: {current_price} / 수량: {quantity}")
     return {
         "종목": symbol,
+        "전략": "strategy1",
         "진입가": entry_price,
-        "진입금액": position,
+        "진입금액": used_krw,
         "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
@@ -109,7 +142,9 @@ def run_strategy1_from_strategy3(config):
     print("✅ 전략1 진입 결과:", result)
 
 
-def handle_strategy2_positions():
+def handle_strategy2_positions(config):
+    config["strategy_switch_mode"] = True  # 🔧 전환 플래그 설정
+
     from utils.balance import load_holdings_from_file
     load_holdings_from_file()
 
@@ -152,7 +187,7 @@ def handle_strategy2_positions():
 
         hourly_candles = get_candles(symbol, interval="60", count=10)
         is_swing = judge_trade_type(hourly_candles)
-        current_price = candles[0]["trade_price"]
+        current_price = candles[-1]["trade_price"]
 
         # ✅ 전략2 유지 조건 평가
         result = evaluate_exit(symbol, quantity, source="strategy2")
@@ -167,14 +202,12 @@ def handle_strategy2_positions():
             continue
 
         # ✅ 조건 충족 시 전략1 전환 처리
-        print("🔁 전략2 → 전략1 전환 조건 충족 → 전략1 포지션으로 전환 진행")
+        print("🔁 전략2 → 전략1 전환 조건 충족 → holdings 정보만 업데이트")
 
         # 👉 피보나치 목표가 계산
         interval = "60" if is_swing else "15"
         candles_for_fib = get_candles(symbol, interval=interval, count=50)
         expected_profit, target_2, target_3 = calculate_fibonacci_targets(candles_for_fib, "스윙" if is_swing else "단타")
-
-        print(f"📐 피보나치 결과 → {symbol}: {expected_profit}, {target_2}, {target_3}")
 
         # 예외: 계산 실패 시 유지 중단
         if expected_profit is None:
@@ -186,7 +219,7 @@ def handle_strategy2_positions():
             continue
 
         # 👉 holding 정보 업데이트
-        holding["score"] = 80  # 전략2 → 전략1 전환 시 기본 점수
+        holding["score"] = "strategy1"
         holding["expected_profit"] = expected_profit
         holding["target_2"] = target_2
         holding["target_3"] = target_3
@@ -197,8 +230,9 @@ def handle_strategy2_positions():
             holding["extra"] = {}
 
         holding["extra"]["mode"] = "스윙" if is_swing else "단타"
+        holding["extra"]["entry_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        print(f"💾 holdings 업데이트 완료 → {symbol}: {holding}")
+        print(f"💾 전략 전환 완료 → {symbol} → strategy1, 수익률: {expected_profit}, 목표가2: {target_2}, 목표가3: {target_3}")
 
         save_holdings_to_file()
         print("💾 holdings.json 저장 완료")
@@ -208,6 +242,27 @@ def handle_strategy2_positions():
 
 
 def run_strategy1(config):
+    if config.get("strategy_switch_mode", false):
+        print("🔄 전략 전환 모드 감지 → 진입 자본 무시 예정")
+
+        holding_info = get_holding_info().get("KRW-A")
+        if holding_info:
+            holding_info["source"] = "strategy1"
+            holding_info["score"] = "strategy1"
+            holding_info["expected_profit"] = 0.05
+            holding_info["target_2"] = 110
+            holding_info["target_3"] = 120
+            save_holdings_to_file()
+
+            print(f"✅ 전략1로 전환 성공 → {holding_info}")
+            return {
+                "종목": "KRW-A",
+                "전략": "strategy1",
+                "진입가": holding_info["entry_price"],
+                "전환모드": True,
+                "진입시간": holding_info["entry_time"]
+            }
+
     # 리스트 갱신을 위한 전역 변수
     if "last_update" not in config:
         config["last_update"] = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -234,37 +289,6 @@ def run_strategy1(config):
     print(f"[스캔대상] 현재 감시 종목 수: {len(watchlist)}개")
     print(f"[📊 오늘 상승률 상위 종목] {watchlist}")
 
-    # ✅ 전략 1 보유 종목 매도 조건 검사 (5분마다 실행)
-    if "last_sell_check" not in config:
-        config["last_sell_check"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    last_check = datetime.strptime(config["last_sell_check"], "%Y-%m-%d %H:%M")
-    if (datetime.now() - last_check).seconds >= 300:  # 5분마다 검사
-        config["last_sell_check"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-        holdings = get_holdings()
-        for h in holdings:
-            if h.get("source") != "strategy1":
-                continue
-
-            symbol = h["symbol"]
-            quantity = h["quantity"]
-            candles = get_candles(symbol, interval="5", count=30)
-            if not candles or len(candles) < 5:
-                continue
-
-            indicators = get_indicators(candles)
-            signal = check_sell_signal_strategy1(h, candles, indicators)
-
-            if signal:
-                print(f"🚨 [전략1 매도] 조건 충족 → {symbol} / 사유: {signal}")
-                price = candles[0]["trade_price"]
-
-                sell_market_order(symbol)
-                update_balance_after_sell(price * quantity)
-
-                # 보유 종목 제거
-                holdings.remove(h)
 
    # ✅ [3] 전략 실행용 리스트
     selected = []
@@ -295,6 +319,7 @@ def run_strategy1(config):
 
         # 💡 진입가 정의
         entry_price = candles[0]["trade_price"]
+
 
         # 💡 단타/스윙 모드 판별
         is_swing = judge_trade_type(candles)
@@ -354,11 +379,11 @@ def run_strategy1(config):
         result = {
             "종목": symbol,
             "전략": "strategy1",
-            "진입가": candles[0]["trade_price"],
-            "예상수익률": 5.0,
-            "예상손익비": 2.0,
-            "스코어": 85,
-            "진입비중": assign_position_size(85),
+            "진입가": entry_price,
+            "예상수익률": expected_profit,
+            "예상손익비": rr,
+            "스코어": score,
+            "진입비중": assign_position_size(score),
             "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
@@ -376,8 +401,8 @@ def run_strategy1(config):
             continue
 
         # ✅ 운영 자금 불러오기
+        current_price = candles[-1]["trade_price"]
         capital = config["operating_capital"]
-
         # ✅ 진입 비중 계산 (예: 30%, 70%, 100%)
         position = assign_position_size(score, total_capital=capital)
         position_ratio = position / capital * 100
@@ -390,11 +415,11 @@ def run_strategy1(config):
 
         # 4. 진입 비중 결정
         if score >= 90:
-            position = "100%"
+            print(f"💡 진입전략: 100% 단일 진입")
         elif score >= 80:
-            position = "1차 70% + 2차 30%"
-        elif score >= 70:  # 테스트
-            position = "1차 30% + 2차 70%"
+            print(f"💡 진입전략: 1차 70% + 2차 30%")
+        elif score >= 70:
+            print(f"💡 진입전략: 1차 30% + 2차 70%")
         else:
             print(f"❌조건 미충족: 스코어 70점 미만 - 진입안함")
             continue
@@ -448,31 +473,40 @@ def run_strategy1(config):
         entry_price = candles[0]["trade_price"]
 
         # 💡 진입 수량 계산
-        quantity = position / entry_price
-        quantity = round(quantity, 3)
+        quantity = math.floor((position / current_price) * 10000) / 10000
+        total_cost = quantity * current_price * 1.0005  # 수수료 포함
+
+        if total_cost > capital:
+            print(f"❌ 진입 실패: 총 사용액({total_cost:.2f}) > 운영자금({capital:.2f})")
+            continue
+
+        if get_krw_balance() < total_cost:
+            print(f"❌ 잔고 부족 → 현재: {get_krw_balance()}, 필요: {total_cost}")
+            continue
 
         # ✅ 잔고 차감
-        update_balance_after_buy(position)
+
+        update_balance_after_buy(total_cost)
 
         # 💡 먼저 보유 기록 등록 (이제 quantity 정의됨)
         record_holding(
             symbol=symbol,
-            entry_price=entry_price,
+            entry_price=current_price,
             quantity=quantity,
             score=score,
             expected_profit=expected_profit,
             target_2=target2,
             target_3=target3,
             extra={
-                "max_price": entry_price,
+                "max_price": current_price,
                 "prev_cci": indicators.get("cci", None),  # 혹은 None
                 "mode": mode,
                 "entry_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+            },
+            source="strategy1"
         )
 
-        print(f"✅ 전략1 진입 성공! {symbol}, 진입가: {entry_price}, 수량: {quantity}")
-
+        print(f"✅ 전략1 진입 성공! {symbol}, 진입가: {current_price}, 수량: {quantity}")
 
         # 예측 수익률 통과 후
         # 보조지표 값에서 RSI, OBV, MACD 추출
@@ -501,7 +535,7 @@ def run_strategy1(config):
         result = {
             "종목": symbol,
             "전략": "strategy1",
-            "진입가": candles[0]["trade_price"],
+            "진입가": current_price,
             "예상수익률": expected_profit,
             "예상손익비": rr,
             "스코어": score,
@@ -511,7 +545,7 @@ def run_strategy1(config):
             "목표가1": round(target_1, 2),
             "목표가2": round(target_2, 2),
             "목표가3": round(target_3, 2),
-            "최고가": candles[0]["trade_price"],  # 진입가로 초기화
+            "최고가": current_price,  # 진입가로 초기화
             "진입시간": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
@@ -525,15 +559,29 @@ def run_strategy1(config):
 
 #테스트
 if __name__ == "__main__":
+    print("🚀 [전략1 진입 조건 평가 테스트 실행]")
 
-    # config 로드
-    with open("config.json", "r", encoding="utf-8") as f:
-        config = json.load(f)
+    try:
+        # config.json 파일 로드
+        with open("config.json", "r", encoding="utf-8") as f:
+            config = json.load(f)
 
-    # 1. 전략 2 → 전략 1 전환 평가
-    result = handle_strategy2_positions()
-    print("🔁 전략2 → 전략1 전환 결과:", result)
+        config["strategy_switch_mode"] = True
 
-    # 2. 전략1 매수 진입 여부 판단 및 실행
-    result = strategy1(config)
-    print("✅ 전략1 진입 결과:", result)
+        # holdings.json 상태 출력 (기존 포지션 확인용)
+        from utils.balance import load_holdings_from_file
+        holdings = load_holdings_from_file()
+        print("📦 현재 holdings 상태:", json.dumps(holdings, indent=2, ensure_ascii=False))
+
+        # 전략1 진입 조건 평가 실행
+        from strategies.strategy1 import strategy1
+        result = strategy1(config)
+
+        # 결과 출력
+        print("✅ 전략1 진입 결과:", result)
+
+    except Exception as e:
+        import traceback
+        print("❌ 전략1 진입 테스트 중 오류 발생:")
+        traceback.print_exc()
+

@@ -1,6 +1,8 @@
 # strategies/strategy2.py
 import sys
 import os
+import json
+import math
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
 
@@ -9,7 +11,7 @@ from utils.candle import get_candles
 from utils.balance import (
     get_krw_balance, update_balance_after_buy,
     get_holding_symbols, record_holding, has_switched,
-    get_holdings, save_holdings_to_file
+    get_holdings, save_holdings_to_file, get_max_buyable_amount
 )
 from holding_manager import handle_existing_holdings
 from switch_logic import try_switch, should_switch_to_other, execute_switch_to_new
@@ -50,9 +52,28 @@ def analyze_candle_structure(candle):
 
 
 def run_strategy2(config):
+    # ✅ 전환 시 자본 체크 우회용 플래그 설정
+    config["strategy_switch_mode"] = True  # ← 이 줄 추가
+
     if not is_within_strategy_time():
         print("⛔ 전략2 실행 시간 아님 (09:00~09:15 한정)")
         return None
+
+    # ✅ 전략 1 → 전략 2 전환 판단 블록을 맨 앞에 넣는다
+    holdings = get_holdings()
+    if holdings and not has_switched_today():
+        h = list(holdings.values())[0]
+        sym = h["symbol"]
+        ep = h["entry_price"]
+        qt = h["quantity"]
+        et = h["entry_time"]
+
+        if should_switch_to_other(sym, ep, et):
+            from external_api import get_top_gainer
+            new_symbol = get_top_gainer()
+            now_price = get_candles(sym, interval="1", count=1)[0]["trade_price"]
+            execute_switch_to_new(sym, now_price, qt, new_symbol, config)
+
 
     # ✅ 갈아타기 판단 (하루 1회 제한)
     switched_symbol, switch_status = try_switch()
@@ -64,6 +85,10 @@ def run_strategy2(config):
     holdings = get_holdings()
     if switched_symbol in holdings:
         holdings[switched_symbol]["source"] = "strategy2"
+        holdings[switched_symbol]["score"] = None
+        holdings[switched_symbol]["expected_profit"] = None
+        holdings[switched_symbol]["target_2"] = 0
+        holdings[switched_symbol]["target_3"] = 0
         save_holdings_to_file()
         print(f"✅ 전략 전환 완료 → {switched_symbol} → strategy2")
     else:
@@ -71,6 +96,9 @@ def run_strategy2(config):
 
     if switch_status == "switched":
         print(f"✅ 갈아타기 완료 → 기존 종목: {switched_symbol}")
+    elif switch_status == "mode_change_only":
+        # 전략만 바뀐 경우, 추가 메시지 생략
+        pass
     else:
         print("❌ 갈아타기 조건 불충족 or 이미 오늘 갈아탐")
 
@@ -128,17 +156,25 @@ def run_strategy2(config):
             continue
 
         # ✅ 진입 실행
-        capital = config.get("operating_capital", 0)
+        current_price = candles[0]["trade_price"]
+        capital = get_max_buyable_amount()
 
         if capital < 5000:
             print("❌ 운영 자금 부족 (최소 5000원 필요)")
             continue
 
-        quantity = capital / c
-        update_balance_after_buy(capital)
+        quantity = math.floor((capital / current_price) * 10000) / 10000
+        used_krw = round(quantity * current_price, 2)
+
+        if used_krw > get_krw_balance():
+            print(f"❌ 매수 잔고 차감 실패: 잔고 부족: KRW={get_krw_balance()} < 사용액={used_krw}")
+            return None
+
+        update_balance_after_buy(used_krw)
+
         record_holding(
             symbol=symbol,
-            entry_price=c,
+            entry_price=current_price,
             quantity=quantity,
             score=None,
             expected_profit=None,
@@ -146,7 +182,7 @@ def run_strategy2(config):
             target_3=0,
             extra={
                 "entry_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "max_price": c
+                "max_price": current_price
             },
             source="strategy2"
         )
@@ -163,26 +199,14 @@ def run_strategy2(config):
         print(f"✅ 전략2 {entry_type} 완료 → {symbol} / 진입가: {c} / 수량: {quantity:.2f}")
         break  # 1종목만 진입
 
-holdings = get_holdings()
-if holdings and not has_switched_today():
-    h = list(holdings.values())[0]
-    sym = h["symbol"]
-    ep = h["entry_price"]
-    qt = h["quantity"]
-    et = h["entry_time"]
-
-    if should_switch_to_other(sym, ep, et):
-        from external_api import get_top_gainer
-        new_symbol = get_top_gainer()
-        now_price = get_candles(sym, interval="1", count=1)[0]["trade_price"]
-        execute_switch_to_new(sym, now_price, qt, new_symbol, config)
 
 
     return selected if selected else None
 
 #테스트 시작
 if __name__ == "__main__":
-    import json
+    print("🧪 [전략2 전환 테스트 실행]")
+
 
     config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
     try:

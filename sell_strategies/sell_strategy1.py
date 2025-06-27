@@ -2,17 +2,22 @@
 import sys
 import os
 import json
-import schedule
 import time
 import traceback
 from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + "/..")
 
-from sell_strategies.sell_utils import get_indicators, check_sell_signal_strategy1, check_sell_signal_strategy_swing
-from utils.balance import load_holdings_from_file, save_holdings_to_file, remove_holding,update_balance_after_sell
+from sell_strategies.sell_utils import (
+    get_indicators, check_sell_signal_strategy1,
+    check_sell_signal_strategy_swing
+)
+from utils.balance import (
+    load_holdings_from_file, save_holdings_to_file,
+    remove_holding,update_balance_after_sell
+)
 from utils.candle import get_candles
 from utils.trade import sell_market_order
-
+from utils.log_utils import log_sell
 
 
 
@@ -53,81 +58,78 @@ def sell_strategy1(config):
         # ✅ 목표가 정보
         expected_profit = data.get("expected_profit", 0.05)
         target_1 = round(entry_price * (1 + expected_profit), 2)
-        print(f"🎯 1차 목표가: {target_1}")
         target_2 = data.get("target_2")
         target_3 = data.get("target_3")
-        print(f"🎯 목표가2: {target_2}, 목표가3: {target_3}")
 
+        print(f"🎯 목표가1: {target_1}, 목표가2: {target_2}, 목표가3: {target_3}")
 
         # ✅ 매도 조건 평가
         indicators = get_indicators(symbol, candles)
+        signal = None
 
         # ✅ 매도 조건 평가
         if mode == "스윙":
-            result = check_sell_signal_strategy_swing(data, candles, indicators)
-
-            if result:
-                print(f"✅ 스윙 매도 조건 충족: {symbol} / 이유: {result}")
-
-                # 💰 매도 처리
-                price = get_latest_price(symbol)
-                if price:
-                    sell_market_order(symbol)
-                    update_balance_after_sell(symbol, price, quantity)
-                    remove_holding(symbol)
-
-                else:
-                    print(f"❌ 체결가 조회 실패 → {symbol}")
-
-            else:
-                print(f"⏳ 스윙 매도 조건 미충족: {symbol}")
-
-
-        else:  # 단타
+            signal = check_sell_signal_strategy_swing(data, candles, indicators)
+        else:
             signal = check_sell_signal_strategy1(data, candles, indicators)
 
-            if signal:
-                print(f"✅ 단타 매도 조건 충족: {symbol} / 이유: {signal}")
+        if signal:
+            print(f"✅ 스윙 매도 조건 충족: {symbol} / 이유:{signal}")
 
-                # 💰 매도 처리
+            # ✅ 체결가 조회 및 시장가 매도
+            try:
                 price = get_latest_price(symbol)
-                if price:
-                    sell_market_order(symbol)
-                    update_balance_after_sell(symbol, price, quantity)
-                    remove_holding(symbol)
-                else:
-                    print(f"❌ 체결가 조회 실패 → {symbol}")
+                if not price:
+                    raise ValueError("체결가 조회 실패")
 
-            else:
-                print(f"⏳ 단타 매도 조건 미충족: {symbol}")
+
+                # 💰 매도 시도 (최대 2회 재시도)
+                for attempt in range(2):
+                    try:
+                        sell_market_order(symbol)
+                        update_balance_after_sell(symbol, price, quantity)
+                        remove_holding(symbol)
+                        log_sell(symbol, price, f"전략1 매도 ({mode}) - 이유: {signal}")
+                        print(f"💸 매도 완료: {symbol} @ {price}")
+                        break
+                    except Exception as e:
+                        print(f"⚠️ 매도 실패 [{attempt+1}/2]: {e}")
+                        time.sleep(2)
+                else:
+                    print(f"❌ 매도 완전 실패: {symbol} → 로그만 남기고 보유 유지")
+
+            except Exception as e:
+                print(f"❌ 매도 처리 중 오류 발생: {symbol} / {e}")
+
+        else:
+            print(f"⏳ 매도 조건 미충족: {symbol} ({mode})")
 
 
     save_holdings_to_file()
     print("📤 매도 전략 1 완료 — holdings.json 저장됨")
 
 
-# ✅ 5분마다 실행 스케줄러 설정
-def run_scheduler(config):
-    schedule.every(5).minutes.do(lambda: sell_strategy1(config))
-    print("🕒 [전략1 매도] 5분마다 자동 실행 스케줄러 시작됨")
-
-    try:
-        while True:
-            try:
-                schedule.run_pending()
-            except Exception as e:
-                print(f"❌ 스케줄 실행 중 오류 발생: {e}")
-                traceback.print_exc()
-
-            time.sleep(1)
-
-    except KeyboardInterrupt:
-        print("🛑 사용자 종료 요청으로 스케줄러 종료됨")
 
 if __name__ == "__main__":
-    print("🧪 [전략1 매도 조건 평가 트리거] 시작")
-    config = {
-        "operating_capital": 100000,
-        "ready_for_strategy1": False
-    }
-    sell_strategy1(config)
+    print("🧪 [전략1 매도 조건 평가 테스트용 실행] 시작")
+
+    from utils.balance import get_holdings
+
+    try:
+        holdings = get_holdings()
+        has_strategy1 = any(h.get("source") == "strategy1" for h in holdings.values())
+
+        if has_strategy1:
+            print("✅ strategy1 포지션 확인됨 → 매도 조건 평가 시작")
+            config = {
+                "operating_capital": 100000,
+                "ready_for_strategy1": True
+            }
+            sell_strategy1(config)
+        else:
+            print("⏸ strategy1 포지션이 없어 테스트 생략됨")
+
+    except Exception as e:
+        import traceback
+        print("❌ 전략1 테스트용 실행 중 예외 발생:")
+        traceback.print_exc()

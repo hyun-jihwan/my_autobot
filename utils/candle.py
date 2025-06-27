@@ -3,7 +3,7 @@ import requests
 import datetime
 
 #def get_candles(symbol, interval="15", count=30, max_retries=3, retry_delay=1.0):
-def get_candles(symbol, interval="15", count=30): #테스트용
+def get_candles(symbol, interval="1", count=30): #테스트용
     print(f"📊 get_candles 호출됨 → symbol: {symbol}, interval: {interval}, count: {count}")
     """
     업비트 캔들 데이터 조회
@@ -14,29 +14,57 @@ def get_candles(symbol, interval="15", count=30): #테스트용
       - "month" → 월봉
     """
     #테스트 시작
-    if symbol == "KRW-A" and interval == "1":
-        print("📊 KRW-A 캔들 호출됨")
+    # ✅ 전략1 손절 테스트용 15분봉 캔들
+    # ✅ 전략1 진입 테스트용 15분봉 (박스 돌파 상승 흐름)
+    if symbol == "KRW-B" and interval == "15" and count == 30:
         return [
-            # 이전 15개 캔들 - 보통 흐름
+            *[
+                {
+                    "opening_price": 1030 + i,
+                    "high_price": 1030 + i + 1,
+                    "low_price": 1030 + i - 1,
+                    "trade_price": 1030 + i,
+                    "candle_acc_trade_volume": 1000 + (i * 10),
+                    "timestamp": 300000 + i
+                }
+                for i in range(28)
+            ],
             {
-                "opening_price": 98.0 + i,
-                "high_price": 98.3 + i,
-                "low_price": 97.8 + i,
-                "trade_price": 98.2 + i,
-                "candle_acc_trade_volume": 9000 + i * 500
-            } for i in range(15)
-        ] + [
-            # 현재 캔들 - 고점 돌파 + 거래량 급증 + 상승 캔들
+                "opening_price": 1085,  # 고점 찍고 시작
+                "high_price": 1088,     # 트레일링 최고가
+                "low_price": 1075,
+                "trade_price": 1079,    # 트레일링 기준 0.8% 하락 → 익절 조건
+                "candle_acc_trade_volume": 3500,
+                "timestamp": 300028
+            },
             {
-                "opening_price": 112.0,
-                "high_price": 114.0,  # 고점 돌파
-                "low_price": 111.5,
-                "trade_price": 113.5,
-                "candle_acc_trade_volume": 26000  # 직전 대비 충분히 높음
+                "opening_price": 1079,
+                "high_price": 1080,
+                "low_price": 1068,
+                "trade_price": 1070,    # 트레일링 기준 1% 하락 → 전량 익절 트리거
+                "candle_acc_trade_volume": 3800,
+                "timestamp": 300029
             }
         ]
+
+        return candles
+
+    if symbol == "KRW-B" and interval == "1" and count == 1:
+        return [
+            {
+                "opening_price": 1072,
+                "high_price": 1075,
+                "low_price": 1068,
+                "trade_price": 1070,  # 💰 실제 익절 체결가 (trailing high = 1080, 0.7% 하락)
+                "candle_acc_trade_volume": 1200,
+                "timestamp": 400000
+            }
+        ]
+
+        return candles
+
     print(f"❌ 캔들 응답 실패 → {symbol} / interval: {interval}")
-    return 
+    return []
     #테스트 끝
 
     if interval == "day":

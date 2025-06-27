@@ -1,0 +1,82 @@
+[
+  {
+    "time": "2025-06-25 09:54:46",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-25 23:04:13",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-25 23:34:42",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-26 00:21:20",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 99999.92,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100049.91996"
+  },
+  {
+    "time": "2025-06-26 01:40:50",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=0.055015000005369075 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-26 01:45:06",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=0.055015000005369075 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-26 02:29:35",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 100000,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=0.055015000005369075 < 사용액=100050.0"
+  },
+  {
+    "time": "2025-06-26 11:06:18",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 99999.97,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100049.96998499999"
+  },
+  {
+    "time": "2025-06-26 11:09:31",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 99999.97,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100049.96998499999"
+  },
+  {
+    "time": "2025-06-26 11:30:02",
+    "action": "buy",
+    "symbol": "UNKNOWN",
+    "price": 99999.92,
+    "quantity": 0,
+    "reason": "잔고 부족: KRW=100000 < 사용액=100049.91996"
+  }
+]

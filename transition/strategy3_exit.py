@@ -26,6 +26,8 @@ def transition_strategy3_to_1(config):
     if not holdings_dict:
         print("📭 전략3 보유 없음 → 전략1 전환 허용")
         config["ready_for_strategy1"] = True
+        config["strategy_switch_mode"] = True
+        print("🔄 strategy_switch_mode = True 설정됨 (전략3 → 전략1 전환)")
         return []
 
     for symbol, h in list(holdings_dict.items()):

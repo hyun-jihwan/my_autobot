@@ -3,10 +3,14 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from sell_strategies.sell_utils import get_indicators
-from utils.balance import update_balance_after_sell, clear_holdings, remove_holding
+from utils.balance import (
+    update_balance_after_sell,
+    update_holding_field, get_holding_symbols,
+    get_holding_data, remove_holding
+)
 from utils.log_utils import log_sell
-from db.holdings import get_holding_symbols, get_holding_data
 from utils.candle import get_candles
+from utils.trade import sell_market_order
 
 
 def sell_strategy2(candles_dict, balance):
@@ -15,6 +19,7 @@ def sell_strategy2(candles_dict, balance):
     for symbol in get_holding_symbols():
         candles = candles_dict.get(symbol)
         if candles is None or len(candles) < 15:
+            print(f"⚠️ 테스트용 캔들 부족 → {symbol} / 받아온 수: {len(candles) if candles else 0}")
             continue
 
         indicators = get_indicators(symbol, candles)
@@ -22,6 +27,9 @@ def sell_strategy2(candles_dict, balance):
             continue
 
         holding = get_holding_data(symbol)
+        if not holding:
+            continue
+
         entry_price = holding["entry_price"]
         quantity = holding["quantity"]
         prev_cci = holding.get("prev_cci")
@@ -31,19 +39,23 @@ def sell_strategy2(candles_dict, balance):
         # 최고가 갱신
         if current_price > max_price:
             max_price = current_price
-            holding["max_price"] = max_price  # 상태 업데이트 필요
+            update_holding_field(symbol, "max_price", max_price)
 
         # 1. 손절 조건: -2%
         loss_rate = (current_price - entry_price) / entry_price
         if loss_rate <= -0.02:
-            update_balance_after_sell(symbol, current_price, quantity)
-            remove_holding(symbol)
-            log_sell(symbol, current_price, "전략2 손절 (-2%)")
-            sell_results.append({
-                "symbol": symbol,
-                "price": current_price,
-                "type": "손절"
-            })
+            try:
+                sell_market_order(symbol)
+                update_balance_after_sell(symbol, current_price, quantity)
+                log_sell(symbol, current_price, "전략2 손절 (-2%)")
+                sell_results.append({
+                    "symbol": symbol,
+                    "price": current_price,
+                    "type": "손절"
+                })
+            except Exception as e:
+                print(f"❌ 전략2 손절 실패: {symbol} / {e}")
+
             continue
 
         # 2. 트레일링 익절 조건: 최고가 기준 수익률 ≥ 2%
@@ -81,7 +93,8 @@ def sell_strategy2(candles_dict, balance):
             else:
                 print("❌ 조건 3 불충족")
 
-            holding["prev_cci"] = cci  # 상태 업데이트 필요
+            # ✅ prev_cci 저장
+            update_holding_field(symbol, "prev_cci", cci)
 
             # 조건 4: OBV 하락 반전
             if indicators["obv_prev"] > indicators["obv"]:
@@ -95,14 +108,28 @@ def sell_strategy2(candles_dict, balance):
 
             # 조건 2개 이상 만족 → 익절
             if condition_count >= 2:
-                update_balance_after_sell(symbol, current_price, quantity)
-                remove_holding(symbol)
-                log_sell(symbol, current_price, f"전략2 익절 (지표 {condition_count}개 충족)")
-                sell_results.append({
-                    "symbol": symbol,
-                    "price": current_price,
-                    "type": "익절"
-                })
+                try:
+                    sell_market_order(symbol)
+                    update_balance_after_sell(symbol, current_price, quantity)
+                    remove_holding(symbol)
+                    log_sell(symbol, current_price, f"전략2 익절 (지표 {condition_count}개 충족)")
+                    print("📝 로그 기록 완료: logs/sell_log.txt")  # 실제 경로에 맞게 수정
+                    sell_results.append({
+                        "symbol": symbol,
+                        "price": current_price,
+                        "type": "익절"
+                    })
+                    print(f"✅ 전략2 익절 완료: {symbol} / 청산가: {current_price}")
+                except Exception as e:
+                    print(f"❌ 전략2 익절 실패: {symbol} / {e}")
+                    # 중요: 그래도 sell_results 에 기록 남김
+                    sell_results.append({
+                        "symbol": symbol,
+                        "price": current_price,
+                        "type": "익절 (부분 실패)"
+                    })
+
+    print(f"💼 청산 후 보유 종목: {get_holding_symbols()}")
 
     return sell_results
 

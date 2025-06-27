@@ -46,7 +46,24 @@ def clear_holdings():
     print("🧹 보유 종목 전체 제거 완료 (clear_holdings)")
 
 def get_krw_balance():
-    return balance["KRW"]
+    global balance
+    try:
+        if os.path.exists("data/holdings.json"):
+            with open("data/holdings.json", "r", encoding="utf-8") as f:
+                data = json.load(f)
+                balance["KRW"] = data.get("KRW", balance.get("KRW", 0))
+        return balance["KRW"]
+    except Exception as e:
+        print(f"❌ KRW 잔고 로드 실패: {e}")
+        return balance.get("KRW", 0)
+
+def get_max_buyable_amount():
+    """
+    현재 KRW 잔고 기준으로 수수료(0.05%)를 포함한 매수 가능 최대 금액 계산
+    """
+    fee_rate = 0.0005  # 업비트 기준 0.05%
+    krw = get_krw_balance()
+    return krw / (1 + fee_rate)
 
 def update_balance_after_buy(amount):
     global balance
@@ -63,7 +80,7 @@ def update_balance_after_buy(amount):
         record_failed_trade("buy", "UNKNOWN", amount, 0, str(e))
 
 
-def update_balance_after_sell(symbol, sell_price, quantity, quantity, retries=1):
+def update_balance_after_sell(symbol, sell_price, quantity, retries=1):
     global balance
     fee_rate = 0.0005  # 0.05%
     for attempt in range(retries + 1):
@@ -255,3 +272,6 @@ def record_failed_trade(action, symbol, price, quantity, reason):
     logs.append(log)
     with open(log_path, "w", encoding="utf-8") as f:
         json.dump(logs, f, indent=2, ensure_ascii=False)
+
+def get_holding_data(symbol):
+    return balance["holdings"].get(symbol)

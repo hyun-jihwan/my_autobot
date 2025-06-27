@@ -2,16 +2,16 @@
 
 def get_indicators(symbol, candles):
     #테스트용
-    if symbol == "KRW-A":
+    if symbol == "KRW-B":
         print("✅ candles 구조 확인:", type(candles), candles[:1])
         return {
-            "rsi": 75,
-            "rsi_prev": 90,
-            "vwap": 110.5,          # 현재가(101.5) < VWAP → 조건 1 충족
-            "bb_upper": 110.5,      # 고가(104) > 상단 & 현재가 101.5 < 상단 → 조건 2 충족
-            "cci": 75,              # 이전 >100 / 현재 75 → 조건 3 충족
-            "obv": 30000,
-            "obv_prev": 32000      # OBV 하락 → 조건 4 충족
+            "rsi": 68,
+            "rsi_prev": 72,
+            "vwap": 1075.0,          # 현재가(101.5) < VWAP → 조건 1 충족
+            "bb_upper": 1078,      # 고가(104) > 상단 & 현재가 101.5 < 상단 → 조건 2 충족
+            "cci": 80,              # 이전 >100 / 현재 75 → 조건 3 충족
+            "obv": 60000,
+            "obv_prev": 62000,      # OBV 하락 → 조건 4 충족 
         }
 
     #테스트 끝
@@ -149,7 +149,6 @@ def get_indicators(symbol, candles):
         "vwap": vwap,
         "obv": obv_now,
         "obv_prev": obv_prev,
-        "obv_reversal": obv_reversal,
         "cci": cci,
         "bb_upper": bb_upper,
         "bb_middle": bb_middle,
@@ -168,9 +167,17 @@ def check_sell_signal_strategy1(holding, candles, indicators):
     symbol = holding["symbol"]
     entry_price = holding["entry_price"]
     expected_profit = holding.get("expected_profit")
-    current_price = candles[0]["trade_price"]
-    high_prices = [c["high_price"] for c in candles[:5]]
+    current_price = candles[-1]["trade_price"]
+    high_prices = [c["high_price"] for c in candles[:-5]]
     recent_high = max(high_prices)
+
+    # ✅ 최고가 갱신 로직 (계속 추적)
+    current_high = candles[-1]["high_price"]
+    trailing_high = holding.get("trailing_high", entry_price)
+
+    if current_high > trailing_high:
+        holding["trailing_high"] = current_high
+        print(f"📈 최고가 갱신됨 → {symbol}: {trailing_high} → {current_high}")
 
 
     # 📊 지표
@@ -182,7 +189,7 @@ def check_sell_signal_strategy1(holding, candles, indicators):
     upper_band = indicators["bb_upper"]
 
     # 🕯 현재 캔들 정보
-    c = candles[0]
+    c = candles[-1]
     close = c["trade_price"]
     open_ = c["opening_price"]
     high = c["high_price"]
@@ -209,6 +216,7 @@ def check_sell_signal_strategy1(holding, candles, indicators):
     # ✅ 익절 조건
     profit_rate = (current_price - entry_price) / entry_price
 
+    print(f"🧾 {symbol} 진입가: {entry_price}, 현재가: {current_price}, 수익률: {profit_rate:.2%}")
 
     # ✅ 익절 1: 목표가 도달 → 50% 익절 + 최고가 추적 후 -0.7% 하락 시 전량 익절
     if expected_profit and profit_rate >= expected_profit:
@@ -236,15 +244,24 @@ def check_sell_signal_strategy1(holding, candles, indicators):
     return None
 
 def check_sell_signal_strategy_swing(holding, candles, indicators):
+    symbol = holding["symbol"]
     entry = holding["entry_price"]
     target_1 = holding.get("target_2")
     target_2 = holding.get("target_3")
     target_3 = holding.get("target_3")  # 동일 값 유지
 
-    current = candles[0]
+    current = candles[-1]
     current_price = current["trade_price"]
     volume_now = current["candle_acc_trade_volume"]
     open_ = current["opening_price"]
+
+    # ✅ 최고가 갱신 로직 (계속 추적)
+    current_high = current["high_price"]
+    trailing_high = holding.get("trailing_high", entry)
+
+    if current_high > trailing_high:
+        holding["trailing_high"] = current_high
+        print(f"📈 [스윙] 최고가 갱신됨 → {symbol}: {trailing_high} → {current_high}")
 
     # 손절 조건
     if current_price <= entry * 0.98:

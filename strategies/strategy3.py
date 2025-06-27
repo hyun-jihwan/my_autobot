@@ -66,6 +66,50 @@ def check_strategy1_exit_conditions(holding):
     return False
 
 
+# ✅ 새로 추가된 전략3 진입 조건 확인 함수
+def check_strategy3_entry_condition(candles):
+    if len(candles) < 4:
+        return False
+
+    latest = candles[-1]  # ✅ 가장 최근 캔들
+    prev_candles = candles[-4:-1]  # ✅ 이전 3개 캔들
+
+    prev_high = max(c['high_price'] for c in prev_candles)
+    if latest['high_price'] <= prev_high:
+        return False
+
+    price_change = (latest['trade_price'] - candles[-2]['trade_price']) / candles[-2]['trade_price']
+    if price_change < 0.013:
+        return False
+
+    avg_volume = sum(c['candle_acc_trade_volume'] for c in prev_candles) / 3
+    if latest['candle_acc_trade_volume'] < avg_volume * 2:
+        return False
+
+    # 슬리피지 제한
+    if latest['trade_price'] > candles[-2]['trade_price'] * 1.03:
+        return False
+
+    # 좋은 캔들 조건
+    o, h, l, c = latest['opening_price'], latest['high_price'], latest['low_price'], latest['trade_price']
+    body = abs(c - o)
+    candle_range = h - l if h != l else 1
+    upper_wick = h - max(o, c)
+    upper_ratio = upper_wick / body if body != 0 else 1
+    body_ratio = body / candle_range
+
+    if body_ratio < 0.4 or upper_ratio > 0.5:
+        return False
+
+    # 기대 수익률 3% 이상
+    expected_profit = ((c * 1.04) - c) / c
+    if expected_profit < 0.03:
+        return False
+
+
+    return True
+
+
 def run_strategy3(config):
     if not is_active_time():
         print("⛔ 전략3 실행 시간 아님")
@@ -172,7 +216,7 @@ def run_strategy3(config):
                 return None
 
         # ✅ 진입
-        capital = config.get("operating_capital", 0)
+        capital = config.get("operating_capital", 100000)
         if capital < 5000:
             print("❌ 운영 자금 부족")
             return None
@@ -183,16 +227,13 @@ def run_strategy3(config):
             print(f"❌ 진입 실패: 현재 잔고 {current_balance:.2f}원이너무 적음")
             return None
 
-        if current_balance < capital:
-            capital = current_balance
-
 
         # ✅ 지정가 체결 시도 (5초 기다렸다가 시장가 진입)
         print(f"⏳ 5초 대기 후 지정가 진입 시도 → {symbol} @ {price}")
         time.sleep(5)
 
 
-        quantity = round(capital / price, 4)
+        quantity = round(capital / current_price, 4)
         update_balance_after_buy(capital)
         record_holding(symbol, price, quantity, score=score, source="strategy3")
 
@@ -211,3 +252,63 @@ def run_strategy3(config):
 
     return selected if selected else None
 
+#테스트 시작
+
+if __name__ == "__main__":
+    print("🚀 [전략3 실행 시작]")
+
+    test_mode = True  # ✅ 테스트모드 설정 (True = 테스트, False = 실전)
+
+    # ✅ 공통 설정
+    config = {
+        "operating_capital": 100000,
+        "strategy_switch_mode": False,
+    }
+
+    if test_mode:
+        print("🧪 [테스트모드] 전략3 전환 조건 수동 평가 중")
+        symbols = ["KRW-A", "KRW-B"]
+
+        for symbol in symbols:
+            print(f"\n🧪 {symbol}에 대해 전략3 진입 조건 평가 시도")
+
+            candles = get_candles(symbol, interval="1", count=4)
+            if not candles or len(candles) < 4:
+                print(f"❌ [테스트모드] 캔들 부족 → {symbol}")
+                continue
+
+            is_entry = check_strategy3_entry_condition(candles)
+
+            if is_entry:
+                print(f"✅ [테스트모드] 전략3 진입 조건 충족 → {symbol}")
+
+                # ✅ 전략1 보유 시 청산 판단
+                holdings = get_holdings()
+                if holdings:
+                    h = list(holdings.values())[0]
+                    if check_strategy1_exit_conditions(h):
+                        print("🔁 [테스트모드] 전략1 청산 조건 만족 → 청산 후 전략3 진입 실행")
+                        sell_price = get_current_price(h["symbol"])
+                        quantity = h["quantity"]
+                        update_balance_after_sell(h["symbol"], sell_price, quantity)
+                        remove_holding(h["symbol"])
+                    else:
+                        print("⏸ [테스트모드] 전략1 유지 조건 → 전략3 진입 보류")
+                        continue  # 전략1 유지 시 신규 진입하지 않음
+
+                        # 전략3 진입 실행
+                entry_price = candles[-1]["trade_price"]
+                qty = round(config["operating_capital"] / entry_price, 4)
+                update_balance_after_buy(config["operating_capital"])
+                record_holding(symbol, entry_price, qty, score=999, source="strategy3")
+                print(f"✅ [테스트모드] 전략3 진입 실행 완료 → {symbol}")
+
+            else:
+                print(f"❌ [테스트모드] 조건 미충족 → {symbol}")
+
+    else:
+        # ✅ 실전 실행
+        result = run_strategy3(config)
+        print(f"✅ 전략3 실행 결과: {result}")
+
+#테스트 종료
