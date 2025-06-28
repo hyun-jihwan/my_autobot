@@ -8,6 +8,8 @@ from utils.trade import sell_market_order
 from utils.balance import update_balance_after_sell, update_holding_field, remove_holding
 from utils.log_utils import log_sell
 from sell_strategies.sell_utils import get_indicators
+from utils.telegram import notify_sell, handle_error
+
 
 def check_sell_signal_strategy3(holding, candles_dict):
     symbol = holding["symbol"]
@@ -16,7 +18,7 @@ def check_sell_signal_strategy3(holding, candles_dict):
     max_price = holding.get("max_price", entry_price)
 
     # ✅ 1분봉 30개 받아오기 (최근 30분)
-    candles = candles_dict[symbol]
+    candles = candles_dict.get[symbol]
     if not candles or len(candles) < 5:
         print(f"⚠️ {symbol} → 1분봉 캔들 부족")
         return None
@@ -54,60 +56,43 @@ def check_sell_signal_strategy3(holding, candles_dict):
     return None
 
 
-def evaluate_exit_strategy3(holding):
-    signal = check_sell_signal_strategy3(holding, candles_dict)
-    if signal:
-        symbol = holding["symbol"]
-        quantity = holding["quantity"]
-        last_price = candles_dict[symbol][-1]["trade_price"]
+def evaluate_exit_strategy3(holding, candles_dict, config=None):
+    try:
+        signal = check_sell_signal_strategy3(holding, candles_dict)
+        if signal:
+            symbol = holding["symbol"]
+            quantity = holding["quantity"]
+            entry_price = holding["entry_price"]
+            last_price = candles_dict[symbol][-1]["trade_price"]
 
-        print(f"🚨 전략3 매도 시그널 발생: {symbol} / 사유: {signal}")
+            print(f"🚨 전략3 매도 시그널 발생: {symbol} / 사유: {signal}")
 
-        # ✅ 시장가 매도 실행
-        sell_market_order(symbol)
-        update_balance_after_sell(symbol, last_price, quantity)
-        remove_holding(symbol)
-        log_sell(symbol, last_price, f"전략3 매도: {signal}")
-        return True
+            # ✅ 시장가 매도
+            sell_market_order(symbol)
+            update_balance_after_sell(symbol, last_price, quantity)
+            remove_holding(symbol)
+            log_sell(symbol, last_price, f"전략3 매도: {signal}")
+
+            profit = round((last_price - entry_price) * quantity)
+            balance = get_krw_balance()
+
+            # ✅ 매도 알림 발송
+            notify_sell(
+                symbol=symbol,
+                strategy="3",
+                buy_price=entry_price,
+                sell_price=last_price,
+                profit=profit,
+                balance=balance,
+                config=config
+            )
+            print(f"✅ 전략3 매도 완료 및 알림 발송: {symbol} / 수익: {profit}원")
+            return True
+
+    except Exception as e:
+        print(f"❌ 전략3 매도 처리 중 오류: {e}")
+        if config:
+            handle_error(e, location="sell_strategy3", config=config)
+
     return False
 
-
-#테스트 시작
-if __name__ == "__main__":
-    print("🚀 [전략3 익절/손절 테스트 시작 - 테스트 전용 심볼: KRW-B]")
-
-    from utils.balance import get_holdings
-    from utils.candle import get_candles
-
-    symbol = "KRW-B"
-    holdings = get_holdings()
-
-    if symbol not in holdings:
-        print(f"⚠️ {symbol} → holdings.json에 보유 중이지 않음")
-        exit()
-
-    holding = holdings[symbol]
-    if holding.get("source") != "strategy3":
-        print(f"⏩ {symbol} → 전략3 포지션 아님, 테스트 종료")
-        exit()
-
-    print(f"\n🔍 {symbol} → 전략3 익절/손절 조건 평가 시작")
-
-    candles = get_candles(symbol, interval="1", count=30)
-
-    if not candles or len(candles) < 5:
-        print(f"❌ 캔들 부족 → {symbol}")
-        exit()
-
-    candles_dict = {
-        symbol: candles
-    }
-
-    result = evaluate_exit_strategy3(holding)
-
-    if result:
-        print(f"✅ 매도 처리 완료 → {symbol}")
-    else:
-        print(f"❌ 매도 조건 미충족 → {symbol}")
-
-#테스트 종료

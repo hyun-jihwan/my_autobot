@@ -1,20 +1,7 @@
 # sell_utils.py : 매도 전략에서 쓰는 공통 함수 모음
 
 def get_indicators(symbol, candles):
-    #테스트용
-    if symbol == "KRW-B":
-        print("✅ candles 구조 확인:", type(candles), candles[:1])
-        return {
-            "rsi": 68,
-            "rsi_prev": 72,
-            "vwap": 1075.0,          # 현재가(101.5) < VWAP → 조건 1 충족
-            "bb_upper": 1078,      # 고가(104) > 상단 & 현재가 101.5 < 상단 → 조건 2 충족
-            "cci": 80,              # 이전 >100 / 현재 75 → 조건 3 충족
-            "obv": 60000,
-            "obv_prev": 62000,      # OBV 하락 → 조건 4 충족 
-        }
 
-    #테스트 끝
     close_prices = [c["trade_price"] for c in candles]
     volumes = [c["candle_acc_trade_volume"] for c in candles]
 

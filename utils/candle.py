@@ -13,59 +13,6 @@ def get_candles(symbol, interval="1", count=30): #테스트용
       - "week" → 주봉
       - "month" → 월봉
     """
-    #테스트 시작
-    # ✅ 전략1 손절 테스트용 15분봉 캔들
-    # ✅ 전략1 진입 테스트용 15분봉 (박스 돌파 상승 흐름)
-    if symbol == "KRW-B" and interval == "15" and count == 30:
-        return [
-            *[
-                {
-                    "opening_price": 1030 + i,
-                    "high_price": 1030 + i + 1,
-                    "low_price": 1030 + i - 1,
-                    "trade_price": 1030 + i,
-                    "candle_acc_trade_volume": 1000 + (i * 10),
-                    "timestamp": 300000 + i
-                }
-                for i in range(28)
-            ],
-            {
-                "opening_price": 1085,  # 고점 찍고 시작
-                "high_price": 1088,     # 트레일링 최고가
-                "low_price": 1075,
-                "trade_price": 1079,    # 트레일링 기준 0.8% 하락 → 익절 조건
-                "candle_acc_trade_volume": 3500,
-                "timestamp": 300028
-            },
-            {
-                "opening_price": 1079,
-                "high_price": 1080,
-                "low_price": 1068,
-                "trade_price": 1070,    # 트레일링 기준 1% 하락 → 전량 익절 트리거
-                "candle_acc_trade_volume": 3800,
-                "timestamp": 300029
-            }
-        ]
-
-        return candles
-
-    if symbol == "KRW-B" and interval == "1" and count == 1:
-        return [
-            {
-                "opening_price": 1072,
-                "high_price": 1075,
-                "low_price": 1068,
-                "trade_price": 1070,  # 💰 실제 익절 체결가 (trailing high = 1080, 0.7% 하락)
-                "candle_acc_trade_volume": 1200,
-                "timestamp": 400000
-            }
-        ]
-
-        return candles
-
-    print(f"❌ 캔들 응답 실패 → {symbol} / interval: {interval}")
-    return []
-    #테스트 끝
 
     if interval == "day":
         url = "https://api.upbit.com/v1/candles/days"
@@ -195,25 +142,3 @@ def get_all_krw_symbols():
         print(f"❌ 심볼 요청 중 오류: {e}")
         return []
 
-#테스트 시작
-# ✅ candle.py 맨 아래쪽에 테스트용 캔들 저장 함수 추가
-
-def save_test_candles(symbol, candles, filepath="data/test_candles.json"):
-    import json
-    import os
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    
-    all_data = {}
-    if os.path.exists(filepath):
-        with open(filepath, "r", encoding="utf-8") as f:
-            try:
-                all_data = json.load(f)
-            except:
-                all_data = {}
-
-    all_data[symbol] = candles
-    with open(filepath, "w", encoding="utf-8") as f:
-        json.dump(all_data, f, indent=2, ensure_ascii=False)
-
-    print(f"🕯 테스트 캔들 저장 완료 → {symbol}")
-#테스트 끝

@@ -1,6 +1,7 @@
 import json
 import os
 import datetime
+import pyupbit
 from utils.candle import get_candles
 
 
@@ -275,3 +276,46 @@ def record_failed_trade(action, symbol, price, quantity, reason):
 
 def get_holding_data(symbol):
     return balance["holdings"].get(symbol)
+
+def update_balance_from_upbit(access_key, secret_key):
+    """
+    Upbit API를 통해 실시간 KRW 잔고 및 보유 종목을 동기화하여
+    holdings.json 및 메모리 balance를 최신화한다.
+    """
+    try:
+        upbit = pyupbit.Upbit(access_key, secret_key)
+        balances = upbit.get_balances()
+
+        krw_balance = 0
+        holdings = {}
+
+        for b in balances:
+            currency = b.get('currency')
+            balance_amt = float(b.get('balance', 0))
+            avg_buy_price = float(b.get('avg_buy_price', 0))
+
+            if currency == "KRW":
+                krw_balance = balance_amt
+            else:
+                if balance_amt > 0:
+                    symbol = f"KRW-{currency}"
+                    holdings[symbol] = {
+                        "symbol": symbol,
+                        "entry_price": avg_buy_price,
+                        "quantity": balance_amt,
+                        "max_price": avg_buy_price,
+                        "entry_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "source": "sync"
+                    }
+
+        balance["KRW"] = krw_balance
+        balance["holdings"] = holdings
+
+        save_holdings_to_file()
+        print(f"✅ Upbit 실시간 잔고/보유 종목 동기화 완료: KRW={krw_balance}, 보유종목={list(holdings.keys())}")
+
+        return True
+
+    except Exception as e:
+        print(f"❌ Upbit 잔고 동기화 실패: {e}")
+        return False

@@ -12,10 +12,12 @@ from utils.transition_helper import evaluate_exit
 from utils.trade import sell_market_order  # ← 실제 매도 실행
 from utils.fibonacci_target import calculate_fibonacci_targets
 from sell_strategies.sell_strategy3 import evaluate_exit_strategy3
-
+from utils.telegram import notify_transition, notify_switch
 
 
 def transition_strategy3_to_1(config):
+    from utils.telegram import notify_transition
+
     print("🔁 전략3 종료 조건 평가 시작")
 
     holdings_dict = balance_util.get_holdings()
@@ -51,11 +53,34 @@ def transition_strategy3_to_1(config):
             released.append(symbol)
             continue
 
+            # ✅ 전환 실패 알림
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=False,
+                exit_type="손절",
+                config=config
+            )
+            continue
+
         # ✅ 매도 조건 체크
         result = evaluate_exit_strategy3(h)
         if result:
             print(f"✅ [{symbol}] 매도 조건 충족 → 청산 완료")
             released.append(symbol)
+
+            # ✅ 전환 실패 알림 (익절/손절 판별)
+            exit_type = "익절" if current_price >= entry_price else "손절"
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=False,
+                exit_type=exit_type,
+                config=config
+            )
+
             continue
 
         # ✅ 피보나치 목표가 계산
@@ -73,6 +98,17 @@ def transition_strategy3_to_1(config):
             balance_util.update_balance_after_sell(symbol, current_price, quantity)
             balance_util.remove_holding(symbol)
             released.append(symbol)
+
+            # ✅ 전환 실패 알림
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=False,
+                exit_type="손절" if current_price < entry_price else "익절",
+                config=config
+            )
+
             continue
 
 
@@ -84,7 +120,18 @@ def transition_strategy3_to_1(config):
             balance_util.update_balance_after_sell(symbol, current_price, quantity)
             balance_util.remove_holding(symbol)
             released.append(symbol)
-            continue 
+
+            # ✅ 전환 실패 알림
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=False,
+                exit_type="손절" if current_price < entry_price else "익절",
+                config=config
+            )
+
+            continue
 
 
         last = candles_15m[0]
@@ -104,6 +151,16 @@ def transition_strategy3_to_1(config):
             balance_util.update_holding_field(symbol, "target_2", target_2)
             balance_util.update_holding_field(symbol, "target_3", target_3)
             balance_util.update_holding_field(symbol, "score", 80)
+
+            # ✅ 전환 성공 알림
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=True,
+                config=config
+            )
+
         else:
             # ✅ 전환 조건 미충족 → 강제 청산
             print(f"⛔ {symbol} → 전환 조건 미충족 → 강제 청산")
@@ -111,6 +168,16 @@ def transition_strategy3_to_1(config):
             balance_util.update_balance_after_sell(symbol, current_price, quantity)
             balance_util.remove_holding(symbol)
             released.append(symbol)
+
+            # ✅ 전환 실패 알림
+            notify_transition(
+                symbol=symbol,
+                from_strategy="3",
+                to_strategy="1",
+                success=False,
+                exit_type="손절" if current_price < entry_price else "익절",
+                config=config
+            )
 
 
     # ✅ 전략3 전부 청산된 경우 → 전략1 허용
@@ -139,15 +206,3 @@ def handle_strategy3_positions():
     return transition_strategy3_to_1(config)
 
 
-if __name__ == "__main__":
-    print("🧪 전략3 → 전략1 테스트 실행 중...")
-    config_path = os.path.join(os.path.dirname(__file__), "..", "config.json")
-    try:
-        with open(config_path, "r", encoding="utf-8") as f:
-            config = json.load(f)
-    except Exception as e:
-        print(f"❌ config.json 로드 실패: {e}")
-        config = {"operating_capital": 100000, "ready_for_strategy1": False}
-
-    result = transition_strategy3_to_1(config)
-    print(f"📤 청산 또는 전환된 종목: {result}")

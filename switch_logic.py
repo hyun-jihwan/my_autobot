@@ -57,12 +57,32 @@ def try_switch():
         save_holdings_to_file()
         set_switch_today()
         print(f"✅ {symbol} 청산 완료. 갈아타기 가능")
+
+        # ✅ 갈아타기 실패 알림 (청산 후 신규 진입 실패 시)
+        notify_switch(
+            old_symbol=symbol,
+            new_symbol=None,
+            success=False,
+            exit_type="손절" if now_price < entry_price else "익절",
+            config=config
+        )
+
         return symbol, "switched"  # 방금 청산한 종목명 반환
 
     elif price_change >= (0.013 - PRICE_BUFFER) and volume_ratio >= (1.5 - VOLUME_BUFFER):
         print(f"✅ {symbol} 급등 흐름 → 전략만 'strategy2'로 전환")
         # 보유 종목은 그대로, 전략 전환만 허용
         save_holdings_to_file()
+
+        # ✅ 전략 전환 알림
+        notify_transition(
+            symbol=symbol,
+            from_strategy="1",
+            to_strategy="2",
+            success=True,
+            config=config
+        )
+
         return symbol, "mode_change_only"
 
     else:
@@ -72,6 +92,16 @@ def try_switch():
         save_holdings_to_file()
         set_switch_today()
         print(f"✅ {symbol} 청산 완료. 전략2 진입 가능 상태 전환")
+
+        # ✅ 갈아타기 실패 알림
+        notify_switch(
+            old_symbol=symbol,
+            new_symbol=None,
+            success=False,
+            exit_type="손절" if now_price < entry_price else "익절",
+            config=config
+        )
+
         return symbol, "switched"
 
 def should_switch_to_other(symbol, entry_price, entry_time):
@@ -113,7 +143,17 @@ def execute_switch_to_new(symbol, current_price, quantity, new_symbol, config):
     candles = get_candles(new_symbol, interval="1", count=1)
     if not candles:
         print(f"❌ {new_symbol} 캔들 조회 실패")
-        return
+
+        # ✅ 갈아타기 실패 알림
+        notify_switch(
+            old_symbol=symbol,
+            new_symbol=new_symbol,
+            success=False,
+            exit_type="손절" if current_price < quantity else "익절",
+            config=config
+        )
+
+        return {"success": False}
 
     entry_price = candles[-1]["trade_price"]
     quantity = config["operating_capital"] / entry_price
@@ -137,3 +177,23 @@ def execute_switch_to_new(symbol, current_price, quantity, new_symbol, config):
     save_holdings_to_file()
     set_switch_today()
     print(f"✅ 갈아타기 완료 → {new_symbol} 진입 성공")
+
+    # ✅ 갈아타기 성공 알림
+    notify_switch(
+        old_symbol=symbol,
+        new_symbol=new_symbol,
+        success=True,
+        exit_type="익절" if current_price >= quantity else "손절",
+        config=config
+    )
+
+    # ✅ 전략 전환 알림
+    notify_transition(
+        symbol=new_symbol,
+        from_strategy="1",
+        to_strategy="2",
+        success=True,
+        config=config
+    )
+
+    return {"success": True}
