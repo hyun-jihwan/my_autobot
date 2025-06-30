@@ -1,0 +1,37 @@
+# test_google_sheet.py
+
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+from utils.google_sheet_logger import log_trade_to_sheet
+
+
+def test_google_sheet_connection():
+    try:
+        # 구글 시트 및 구글 드라이브 접근 권한
+        scope = [
+            'https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive'
+        ]
+
+        # credentials.json 경로
+        creds = ServiceAccountCredentials.from_json_keyfile_name(
+            'credentials.json', scope
+        )
+
+        # 클라이언트 인증
+        client = gspread.authorize(creds)
+
+        # 구글 시트 이름 입력
+        sheet = client.open("TradingBot_Report").sheet1
+
+        # 테스트 데이터 입력
+        test_row = ["연동 확인", "성공", "테스트", "완료"]
+        sheet.append_row(test_row)
+
+        print("✅ 구글 시트 연동 및 데이터 입력 성공!")
+
+    except Exception as e:
+        print(f"❌ 구글 시트 연동 실패: {e}")
+
+if __name__ == "__main__":
+    test_google_sheet_connection()

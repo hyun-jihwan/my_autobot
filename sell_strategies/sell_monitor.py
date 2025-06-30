@@ -18,10 +18,17 @@ from utils.balance import (
     get_holding_symbols,
     get_holding_data,
     load_holdings_from_file,
+    update_balance_from_upbit
 )
 from utils.candle import get_candles
 from utils.error_handler import handle_error
 from utils.telegram import notify_bot_start, notify_bot_stop
+from utils.google_sheet_logger import log_trade_to_sheet
+
+
+# ✅ 환경변수 API 키
+access_key = os.getenv("UPBIT_ACCESS_KEY")
+secret_key = os.getenv("UPBIT_SECRET_KEY")
 
 
 # ✅ 전략2,3용 캔들 수집 함수
@@ -93,12 +100,19 @@ def run_sell_monitor():
                 last_run_strategy2_3 = now
 
 
+            # ✅ 업비트 실시간 잔고 동기화
+            try:
+                update_balance_from_upbit(access_key, secret_key)
+                print("✅ 업비트 잔고 실시간 동기화 완료 (sell_monitor)")
+            except Exception as e:
+                handle_error(e, location="sell_monitor.py - update_balance_from_upbit", config=config)
+
+
         except KeyboardInterrupt:
             notify_bot_stop(config, reason="사용자 수동 종료")
             print("🛑 수동 종료됨")
             break
         except Exception as e:
-            handle_error(e, location="sell_monitor.py - 메인 루프", config=config)
             handle_error(e, location="sell_monitor.py - 메인 루프", config=config)
             notify_bot_stop(config, reason=f"예외 종료: {str(e)}")
             time.sleep(10)

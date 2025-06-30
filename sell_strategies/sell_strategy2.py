@@ -6,13 +6,15 @@ from sell_strategies.sell_utils import get_indicators
 from utils.balance import (
     update_balance_after_sell,
     update_holding_field, get_holding_symbols,
-    get_holding_data, remove_holding
+    get_holding_data, remove_holding,
+    get_krw_balance
 )
 from utils.log_utils import log_sell
 from utils.candle import get_candles
 from utils.trade import sell_market_order
 from utils.telegram import notify_sell
 from utils.error_handler import handle_error
+from utils.google_sheet_logger import log_trade_to_sheet
 
 
 def sell_strategy2(candles_dict, balance, config=None):
@@ -66,6 +68,23 @@ def sell_strategy2(candles_dict, balance, config=None):
                         config=config
                     )
 
+                    # ✅ 구글 시트 기록 (Raw_Data 구조)
+                    log_trade_to_sheet({
+                        "날짜": datetime.now().strftime("%Y-%m-%d"),
+                        "시간": datetime.now().strftime("%H:%M:%S"),
+                        "종목": symbol,
+                        "구분": "매도",
+                        "전략": "strategy2-손절",
+                        "매수금액": round(entry_price * quantity, 2),
+                        "매도금액": round(current_price * quantity, 2),
+                        "수익률(%)": profit_rate,
+                        "수익금액": profit,
+                        "누적수익": 0,
+                        "실시간잔고": int(current_balance)
+                    })
+
+                    update_summary_sheets()
+
                     print(f"✅ 전략2 손절 완료: {symbol} @ {current_price}")
                     sell_results.append({
                         "symbol": symbol,
@@ -114,6 +133,24 @@ def sell_strategy2(candles_dict, balance, config=None):
                             exit_type="익절",
                             config=config
                         )
+
+
+                        # ✅ 구글 시트 기록 (Raw_Data 구조)
+                        log_trade_to_sheet({
+                            "날짜": datetime.now().strftime("%Y-%m-%d"),
+                            "시간": datetime.now().strftime("%H:%M:%S"),
+                            "종목": symbol,
+                            "구분": "매도",
+                            "전략": f"strategy2-익절-{condition_count}조건",
+                            "매수금액": round(entry_price * quantity, 2),
+                            "매도금액": round(current_price * quantity, 2),
+                            "수익률(%)": profit_rate,
+                            "수익금액": profit,
+                            "누적수익": 0,
+                            "실시간잔고": int(current_balance)
+                        })
+
+                        update_summary_sheets()
 
                         print(f"✅ 전략2 익절 완료: {symbol} @ {current_price}")
                         sell_results.append({

@@ -5,10 +5,11 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils.candle import get_candles
 from utils.trade import sell_market_order
-from utils.balance import update_balance_after_sell, update_holding_field, remove_holding
+from utils.balance import update_balance_after_sell, update_holding_field, remove_holding, get_krw_balance
 from utils.log_utils import log_sell
 from sell_strategies.sell_utils import get_indicators
 from utils.telegram import notify_sell, handle_error
+from utils.google_sheet_logger import log_trade_to_sheet
 
 
 def check_sell_signal_strategy3(holding, candles_dict):
@@ -58,11 +59,12 @@ def check_sell_signal_strategy3(holding, candles_dict):
 
 def evaluate_exit_strategy3(holding, candles_dict, config=None):
     try:
+        symbol = holding["symbol"]
+        entry_price = holding["entry_price"]
+        quantity = holding["quantity"]
         signal = check_sell_signal_strategy3(holding, candles_dict)
+
         if signal:
-            symbol = holding["symbol"]
-            quantity = holding["quantity"]
-            entry_price = holding["entry_price"]
             last_price = candles_dict[symbol][-1]["trade_price"]
 
             print(f"🚨 전략3 매도 시그널 발생: {symbol} / 사유: {signal}")
@@ -86,6 +88,24 @@ def evaluate_exit_strategy3(holding, candles_dict, config=None):
                 balance=balance,
                 config=config
             )
+
+            # ✅ 구글 시트 기록 (Raw_Data 구조)
+            log_trade_to_sheet({
+                "날짜": datetime.now().strftime("%Y-%m-%d"),
+                "시간": datetime.now().strftime("%H:%M:%S"),
+                "종목": symbol,
+                "구분": "매도",
+                "전략": "strategy3",
+                "매수금액": round(entry_price * quantity, 2),
+                "매도금액": round(last_price * quantity, 2),
+                "수익률(%)": profit_rate,
+                "수익금액": profit,
+                "누적수익": 0,
+                "실시간잔고": int(balance)
+            })
+
+            update_summary_sheets()
+
             print(f"✅ 전략3 매도 완료 및 알림 발송: {symbol} / 수익: {profit}원")
             return True
 

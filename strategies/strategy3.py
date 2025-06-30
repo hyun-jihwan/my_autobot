@@ -19,7 +19,7 @@ from utils.error_handler import handle_error
 
 def is_active_time():
     now = datetime.datetime.now().time()
-    return now >= datetime.time(9, 16) or now <= datetime.time(8, 59)
+    return now >= datetime.time(9, 16) or now <= datetime.time(8, 50)
 
 
 def recent_high_breakout(candles, current_price):

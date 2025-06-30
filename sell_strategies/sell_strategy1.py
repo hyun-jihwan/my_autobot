@@ -14,6 +14,7 @@ from sell_strategies.sell_utils import (
 from utils.balance import (
     load_holdings_from_file, save_holdings_to_file,
     remove_holding,update_balance_after_sell
+    update_balance_from_upbit, get_krw_balance
 )
 from utils.candle import get_candles
 from utils.trade import sell_market_order
@@ -21,6 +22,7 @@ from utils.log_utils import log_sell
 from utils.telegram import notify_sell
 from utils.error_handler import handle_error
 from utils.price import get_current_price
+from utils.google_sheet_logger import log_trade_to_sheet
 
 
 def get_latest_price(symbol):
@@ -103,6 +105,24 @@ def sell_strategy1(config):
                                 exit_type=exit_type,
                                 config=config
                             )
+
+
+                            # ✅ 구글 시트 기록 (Raw_Data 딕셔너리 방식)
+                            log_trade_to_sheet({
+                                "날짜": datetime.now().strftime("%Y-%m-%d"),
+                                "시간": datetime.now().strftime("%H:%M:%S"),
+                                "종목": symbol,
+                                "구분": "매도",
+                                "전략": f"strategy1-{mode}",
+                                "매수금액": round(entry_price * quantity, 2),
+                                "매도금액": round(price * quantity, 2),
+                                "수익률(%)": profit_rate,
+                                "수익금액": profit,
+                                "누적수익": 0,  # 추후 누적 수익 연동 시 수정
+                                "실시간잔고": int(balance_now)
+                            })
+
+                            update_summary_sheets()
 
                             print(f"💸 매도 완료: {symbol} @ {price} ({exit_type}) / 수익: {profit}원")
                             break
